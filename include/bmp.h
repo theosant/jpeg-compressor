@@ -28,5 +28,18 @@ unsigned int   NColours;        /* Number of colors used */
 unsigned int   ImportantColours;   /* Number of important colors */
 } BITMAPINFOHEADER;
 
+typedef struct
+{
+        unsigned char R;
+        unsigned char G;
+        unsigned char B;      
+} Pixel;
+
+void loadBMPHeaders (FILE *fp);
+
+void printHeaders (BITMAPFILEHEADER *FileHeader,  BITMAPINFOHEADER *InfoHeader);
+BITMAPINFOHEADER leituraInfoHeader(FILE *F);
+BITMAPFILEHEADER leituraHeader(FILE *F);
+
 
 #endif
