@@ -7,14 +7,17 @@
 int main(){
     FILE *input;
     // *output;
-    //BITMAPFILEHEADER FileHeader;       /* File header */
-    //BITMAPINFOHEADER InfoHeader; 
-    //Pixel *Image;
     if(!(input = fopen(IMG, "rb"))){
         printf("Error: could not open input file." );
         exit(1);
-}
-    loadBMPHeaders (input);
-    printf("Hello World!");
+    }
+    BITMAPFILEHEADER FileHeader;       /* File header */
+    BITMAPINFOHEADER InfoHeader; 
+    // carregar dois headers: info header e file header
+    loadBMPHeaders (input, &FileHeader, &InfoHeader);
+    printHeaders(&FileHeader, &InfoHeader);
+   
+    // carregar pixels
+    loadBMPImage(input, InfoHeader);
     return 0;
 }

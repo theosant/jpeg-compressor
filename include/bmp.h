@@ -35,11 +35,12 @@ typedef struct
         unsigned char B;      
 } Pixel;
 
-void loadBMPHeaders (FILE *fp);
+void loadBMPHeaders (FILE *fp,  BITMAPFILEHEADER *FileHeader, BITMAPINFOHEADER *InfoHeader);
+
 
 void printHeaders (BITMAPFILEHEADER *FileHeader,  BITMAPINFOHEADER *InfoHeader);
 BITMAPINFOHEADER leituraInfoHeader(FILE *F);
 BITMAPFILEHEADER leituraHeader(FILE *F);
-
+Pixel* loadBMPImage(FILE *input, BITMAPINFOHEADER InfoHeader);
 
 #endif

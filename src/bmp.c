@@ -2,20 +2,20 @@
 #include <stdlib.h>
 #include "bmp.h"
 
-void loadBMPHeaders (FILE *fp)
+void loadBMPHeaders (FILE *fp, BITMAPFILEHEADER *FileHeader, BITMAPINFOHEADER *InfoHeader)
 {  
-    BITMAPFILEHEADER FileHeader =  leituraHeader(fp);
-    BITMAPINFOHEADER InfoHeader = leituraInfoHeader(fp);
+    *FileHeader =  leituraHeader(fp);
+    *InfoHeader = leituraInfoHeader(fp);
    
     
-    if (InfoHeader.Compression != 0)
+    if (InfoHeader->Compression != 0)
     {
       printf("This is a compressed BMP!!!");
       fclose(fp);
       return;
     }
     
-    printHeaders(&FileHeader, &InfoHeader);
+
          
 }
 
@@ -72,6 +72,21 @@ void printHeaders (BITMAPFILEHEADER *FileHeader,  BITMAPINFOHEADER *InfoHeader)
      printf("Number of colors: %d\n", InfoHeader->NColours);
      printf("Numberof important colors: %d\n", InfoHeader->ImportantColours); 
      
-     system("pause");
-  
 }
+
+Pixel* loadBMPImage(FILE *input, BITMAPINFOHEADER InfoHeader){
+    Pixel *Image = (Pixel *) malloc((InfoHeader.Width * InfoHeader.Height) * sizeof(Pixel));
+    int i, j, tam;
+    
+    tam = InfoHeader.Height * InfoHeader.Width;
+    fseek(input, 54, SEEK_SET); //skipping the header (54 bytes)
+    
+    for (i=0; i < tam; i++){
+       
+        Image[i].B = fgetc(input);
+        Image[i].G = fgetc(input);
+        Image[i].R = fgetc(input);
+    }
+    return Image;
+ }
+ 
