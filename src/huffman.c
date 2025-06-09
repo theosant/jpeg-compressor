@@ -1,4 +1,4 @@
-#include "huffman.h"
+#include "../include/huffman.h"
 
 /* Início das funções min-heap*/
 /* Início das funções Auxiliares*/
@@ -20,10 +20,10 @@ static void heapifyUp(MinHeap* heap, int indice) {
 }
 
 /* Outra função para manter a propriedade da min-heap. Usado após remover a raiz */
-static void heapifyDown(MinHeap* heap, int indice) {
-    int menor = indice;
-    int esquerda = 2 * indice + 1;
-    int direita = 2 * indice + 2;
+static void heapifyDown(MinHeap* heap, unsigned indice) {
+    unsigned menor = indice;
+    unsigned esquerda = 2 * indice + 1;
+    unsigned direita = 2 * indice + 2;
 
     if (esquerda < heap->tamanho && 
         heap->nos[esquerda]->frequencia < heap->nos[menor]->frequencia) {
@@ -98,27 +98,148 @@ HuffmanNode* criarNo(int valor, unsigned frequencia) {
     return novoNo;
 }
 
-/* TESTE */
-
-int main() {
-    // 1. Cria uma heap vazia
-    MinHeap* heap = criarMinHeap(10);
-    
-    // 2. Insere nós com frequências aleatórias
-    inserirMinHeap(heap, criarNo('A', 5));
-    inserirMinHeap(heap, criarNo('B', 3));
-    inserirMinHeap(heap, criarNo('C', 8));
-    inserirMinHeap(heap, criarNo('D', 1));
-
-    // 3. Extrai os nós em ordem crescente
-    printf("Ordem de extracao (deveria ser: D, B, A, C):\n");
-    while (heap->tamanho > 0) {
-        HuffmanNode* no = extrairMin(heap);
-        printf("Simbolo: %c, Frequencia: %u\n", no->valor, no->frequencia);
-        free(no);
+/* Funções da árvore Huffman */
+HuffmanNode* construirArvoreHuffman(const int* dados, unsigned tamanho) {
+    // 1. Contar frequências
+    int frequencias[256] = {0};
+    for (unsigned i = 0; i < tamanho; i++) {
+        frequencias[dados[i]]++;
     }
 
-    // 4. Libera a heap
+    // 2. Criar min-heap
+    MinHeap* heap = criarMinHeap(256);
+    for (int i = 0; i < 256; i++) {
+        if (frequencias[i] > 0) {
+            inserirMinHeap(heap, criarNo(i, frequencias[i]));
+        }
+    }
+
+    // 3. Construir árvore
+    while (heap->tamanho > 1) {
+        HuffmanNode* esquerda = extrairMin(heap);
+        HuffmanNode* direita = extrairMin(heap);
+        
+        HuffmanNode* top = criarNo('$', esquerda->frequencia + direita->frequencia);
+        top->esquerda = esquerda;
+        top->direita = direita;
+        
+        inserirMinHeap(heap, top);
+    }
+
+    HuffmanNode* raiz = extrairMin(heap);
     destruirMinHeap(heap);
-    return 0;
+    return raiz;
+}
+
+void liberarArvoreHuffman(HuffmanNode* raiz) {
+    if (raiz) {
+        liberarArvoreHuffman(raiz->esquerda);
+        liberarArvoreHuffman(raiz->direita);
+        free(raiz);
+    }
+}
+
+/* Funções da tabela Huffman */
+void gerarCodigos(HuffmanNode* raiz, char* codigo, int top, TabelaHuffman* tabela) {
+    if (!raiz) return;
+
+    if (raiz->esquerda) {
+        codigo[top] = '0';
+        gerarCodigos(raiz->esquerda, codigo, top + 1, tabela);
+    }
+    if (raiz->direita) {
+        codigo[top] = '1';
+        gerarCodigos(raiz->direita, codigo, top + 1, tabela);
+    }
+    if (!raiz->esquerda && !raiz->direita) {
+        // Verifica se o valor está dentro do intervalo válido
+        if (raiz->valor >= 0 && raiz->valor < 256) {
+            tabela->codigos[raiz->valor] = malloc(top + 1);
+            if (!tabela->codigos[raiz->valor]) {
+                perror("Falha ao alocar código");
+                exit(EXIT_FAILURE);
+            }
+            memcpy(tabela->codigos[raiz->valor], codigo, top);
+            tabela->codigos[raiz->valor][top] = '\0';
+        } else {
+            printf("[ERRO] Valor inválido: %d\n", raiz->valor);
+        }
+    }
+}
+
+// Função aux para gerar tabela huffman
+TabelaHuffman* construirTabelaHuffmanComFrequencias(const int* frequencias) {
+    MinHeap* heap = criarMinHeap(256);
+    for (int i = 0; i < 256; i++) {
+        if (frequencias[i] > 0) {
+            inserirMinHeap(heap, criarNo(i, frequencias[i]));
+        }
+    }
+
+    // Construir árvore
+    while (heap->tamanho > 1) {
+        HuffmanNode* esquerda = extrairMin(heap);
+        HuffmanNode* direita = extrairMin(heap);
+        HuffmanNode* top = criarNo('$', esquerda->frequencia + direita->frequencia);
+        top->esquerda = esquerda;
+        top->direita = direita;
+        inserirMinHeap(heap, top);
+    }
+
+    HuffmanNode* raiz = extrairMin(heap);
+    destruirMinHeap(heap);
+
+    TabelaHuffman* tabela = malloc(sizeof(TabelaHuffman));
+    tabela->codigos = calloc(256, sizeof(char*));
+    tabela->simbolos = malloc(256 * sizeof(int));
+    tabela->tamanho = 256;
+
+    char codigo[256];
+    gerarCodigos(raiz, codigo, 0, tabela);
+    liberarArvoreHuffman(raiz);
+    return tabela;
+}
+
+TabelaHuffman* construirTabelaHuffman(BlocoYCbCr* blocos, int num_blocos, char componente) {
+    int frequencias[256] = {0};
+
+    for (int i = 0; i < num_blocos; i++) {
+        for (int y = 0; y < 8; y++) {
+            for (int x = 0; x < 8; x++) {
+                int valor;
+                if (componente == COMP_Y) {
+                    valor = (int)round(blocos[i].Y[y][x]);
+                } else if (componente == COMP_CB) {
+                    valor = (int)round(blocos[i].Cb[y][x]);
+                } else {
+                    valor = (int)round(blocos[i].Cr[y][x]);
+                }
+
+                valor = valor < 0 ? 0 : (valor > 255 ? 255 : valor);
+                frequencias[valor]++;
+            }
+        }
+    }
+
+    for (int i = 0; i < 256; i++) {
+        if (frequencias[i] == 0) {
+            frequencias[i] = 1;
+        }
+    }
+
+    return construirTabelaHuffmanComFrequencias(frequencias);
+}
+
+
+void destruirTabelaHuffman(TabelaHuffman* tabela) {
+    if (tabela) {
+        for (unsigned i = 0; i < 256; i++) {
+            if (tabela->codigos[i]) {
+                free(tabela->codigos[i]);
+            }
+        }
+        free(tabela->codigos);
+        free(tabela->simbolos);
+        free(tabela);
+    }
 }

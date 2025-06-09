@@ -4,6 +4,20 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <string.h>
+#include <math.h>
+
+typedef enum {
+    COMP_Y = 1,  // Luminância
+    COMP_CB = 2, // Crominância Azul
+    COMP_CR = 3  // Crominância Vermelha
+} Componente;
+
+typedef struct {
+    float Y[8][8];
+    float Cb[8][8];
+    float Cr[8][8];
+} BlocoYCbCr;
 
 /* Decodifica código -> símbolo, ou seja, gera a tabela de códigos */
 typedef struct HuffmanNode HuffmanNode;
@@ -30,7 +44,7 @@ typedef struct {
 } MinHeap;
 
 /* Funções da tabela*/
-TabelaHuffman* ConstruirTabelaHuffman(const int* dados, unsigned tamanho);
+TabelaHuffman* construirTabelaHuffman(BlocoYCbCr* blocos, int num_blocos, char componente);
 void destruirTabelaHuffman(TabelaHuffman *tabela);
 void comprimirDadosHuffman(const int* dados, unsigned tamanho, 
     const TabelaHuffman* tabela, unsigned char** bufferSaida, 

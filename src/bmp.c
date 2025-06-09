@@ -1,6 +1,4 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include "bmp.h"
+#include "../include/bmp.h"
 
 void loadBmpHeaders(FILE *fp, BitmapFileHeader *fileHeader, BitmapInfoHeader *infoHeader) {
     *fileHeader = readFileHeader(fp);

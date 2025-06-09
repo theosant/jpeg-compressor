@@ -1,33 +1,59 @@
+# Configurações básicas
+CC = gcc
+CFLAGS = -Wall -Wextra -std=c99 -I$(INC_DIR)
+LDFLAGS = -mconsole -lm
+DEBUG_FLAGS = -g
+RELEASE_FLAGS = -O2
+
 # Diretórios
 SRC_DIR = src
 INC_DIR = include
 BIN_DIR = bin
+OBJ_DIR = $(BIN_DIR)\obj
 
-# Compilador e flags
-CC = gcc
-CFLAGS = -Wall -Wextra -std=c99 -I$(INC_DIR)
-
-# Arquivos fonte
-SRCS = main.c $(wildcard $(SRC_DIR)/*.c)
+# Arquivos fonte e objetos
+SRCS = $(wildcard $(SRC_DIR)/*.c) ./main.c
+OBJS = $(patsubst $(SRC_DIR)/%.c,$(OBJ_DIR)/%.o,$(SRCS))
+DEPS = $(wildcard $(INC_DIR)/*.h)
 
 # Nome do executável
-TARGET = $(BIN_DIR)/main
+TARGET = $(BIN_DIR)\main.exe
 
-# Regra principal
-all: $(TARGET)
+# Regra principal (release por padrão)
+all: release
 
-# Compilação do executável
-$(TARGET): $(BIN_DIR) $(SRCS)
-	$(CC) $(CFLAGS) -o $(TARGET) $(SRCS)
+# Build de release
+release: CFLAGS += $(RELEASE_FLAGS)
+release: $(TARGET)
 
-# Criação da pasta bin, se necessário
-$(BIN_DIR):
-	mkdir -p $(BIN_DIR)
+# Build para debug
+debug: CFLAGS += $(DEBUG_FLAGS)
+debug: $(TARGET)
 
+# Link do executável
+$(TARGET): $(OBJS)
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^
 
-run: all
-	./$(TARGET)
-	
-# Limpeza
+# Compilação dos objetos
+$(OBJ_DIR)/%.o: $(SRC_DIR)/%.c $(DEPS) | $(OBJ_DIR)
+	$(CC) $(CFLAGS) -c -o $@ $<
+
+# Criação dos diretórios necessários (compatível com Windows)
+$(BIN_DIR) $(OBJ_DIR):
+	if not exist "$@" mkdir "$@"
+
+# Execução
+run: release
+	$(TARGET)
+
+# Limpeza (compatível com Windows)
 clean:
-	rm -rf $(BIN_DIR)
+	if exist "$(BIN_DIR)" rmdir /s /q "$(BIN_DIR)"
+
+# Informações do projeto
+info:
+	@echo Sources: $(SRCS)
+	@echo Objects: $(OBJS)
+	@echo Dependencies: $(DEPS)
+
+.PHONY: all release debug run clean info

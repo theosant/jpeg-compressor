@@ -1,6 +1,8 @@
 #ifndef _BITMAP_H_
 #  define _BITMAP_H_
 
+#include <stdio.h>
+#include <stdlib.h>
 
 typedef struct                       /**** BMP file header structure ****/
 {
