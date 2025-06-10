@@ -1,6 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include "include/jpeg.h"
+#include "include/compressao_sem_perdas.h"
 
 #define IMG "test_images/paisagem_32x32.bmp"
 #define OUTPUT_JPEG "paisagem_compressed.jls"  // JLS = JPEG Lossless
