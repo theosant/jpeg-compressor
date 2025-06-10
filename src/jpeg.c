@@ -18,6 +18,35 @@ PixelYCbCr* convertRgbToYCbCr(Pixel *input, BitmapInfoHeader infoHeader) {
     return converted;
 }
 
+Pixel* convertYCbCrToRgb(PixelYCbCr* imagem_ycbcr, int largura, int altura) {
+    int total_pixels = largura * altura;
+    Pixel* imagem_rgb = malloc(total_pixels * sizeof(Pixel));
+    
+    if (!imagem_rgb) {
+        perror("Erro ao alocar memória para imagem RGB");
+        return NULL;
+    }
+
+    for (int i = 0; i < total_pixels; i++) {
+        // Obter componentes YCbCr
+        float Y = imagem_ycbcr[i].Y;
+        float Cb = imagem_ycbcr[i].Cb - 128.0f;  // Centraliza em 0
+        float Cr = imagem_ycbcr[i].Cr - 128.0f;  // Centraliza em 0
+
+        // Fórmulas de conversão padrão ITU-R BT.601
+        float R = Y + 1.402f * Cr;
+        float G = Y - 0.344136f * Cb - 0.714136f * Cr;
+        float B = Y + 1.772f * Cb;
+
+        // Garantir que os valores estão no intervalo [0, 255]
+        imagem_rgb[i].R = (unsigned char)(R < 0 ? 0 : (R > 255 ? 255 : R));
+        imagem_rgb[i].G = (unsigned char)(G < 0 ? 0 : (G > 255 ? 255 : G));
+        imagem_rgb[i].B = (unsigned char)(B < 0 ? 0 : (B > 255 ? 255 : B));
+    }
+
+    return imagem_rgb;
+}
+
 BlocoYCbCr* dividirBlocos(PixelYCbCr* imagem, int largura, int altura, int* num_blocos) {
     // Calcula quantos blocos serão necessários na horizontal e vertical (arredonda para cima a divisão)
     int blocos_largura = (largura + 7) / 8;

@@ -43,22 +43,22 @@ int main() {
 
     switch (opcao) {
         case 1:
-            printf("Iniciando compressao sem perdas...");
+            printf("Iniciando compressao sem perdas...\n");
             comprimirJPEGSemPerdas(IMG, OUTPUT_JPEG);
             printf("Imagem comprimida com sucesso em: %s\n", OUTPUT_JPEG);
             break;
         case 2:
-            printf("Iniciando compressao com perdas...");
+            printf("Iniciando compressao com perdas...\n");
             // comprimirJPEGComPerdas(IMG, OUTPUT_JPEG);
             printf("Imagem comprimida com sucesso em: %s\n", OUTPUT_JPEG);
             break;
         case 3:
-            printf("Iniciando descompressao sem perdas...");
+            printf("Iniciando descompressao sem perdas...\n");
             descomprimirJPEGSemPerdas(OUTPUT_JPEG, OUTPUT_BMP);
-            // printf("Imagem descomprimida com sucesso em: %s\n", OUTPUT_JPEG);
+            printf("Imagem descomprimida com sucesso em: %s\n", OUTPUT_BMP);
             break;
         case 4:
-            printf("Iniciando descompressao com perdas...");
+            printf("Iniciando descompressao com perdas...\n");
             // descomprimirJPEGSemPerdas(OUTPUT_JPEG, OUTPUT_BMP);
             // printf("Imagem descomprimida com sucesso em: %s\n", OUTPUT_JPEG);
             break;

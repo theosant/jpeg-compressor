@@ -20,6 +20,7 @@ typedef struct {
 } JLSHeader;
 
 PixelYCbCr* convertRgbToYCbCr(Pixel *input, BitmapInfoHeader infoHeader);
+Pixel* convertYCbCrToRgb(PixelYCbCr* imagem_ycbcr, int largura, int altura);
 BlocoYCbCr* dividirBlocos(PixelYCbCr* imagem, int largura, int altura, int* num_blocos);
 
 #endif
