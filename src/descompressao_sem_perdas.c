@@ -7,7 +7,7 @@ Reconstruir as tabelas Huffman (elas precisam ser armazenadas no arquivo ou reca
 
 Ler e decodificar os dados comprimidos (CHECK)
 
-Aplicar a DPCM inversa
+Aplicar a DPCM inversa (CHECK)
 
 Converter de YCbCr para RGB
 
@@ -127,6 +127,29 @@ void decodificarBloco(FILE* input, TabelaHuffman* tabela_Y, TabelaHuffman* tabel
     liberarArvoreHuffman(arvore_Cr);
 }
 
+void DCPMInversa(BlocoYCbCr* blocos, int num_blocos) {
+    float DC_Y = 0.0f;
+    float DC_CB = 0.0f;
+    float DC_CR = 0.0f;
+
+    for (int i = 0; i < num_blocos; i++){
+        // Recupera as diferenças armazenadas
+        float diff_Y = blocos[i].Y[0][0];
+        float diff_Cb = blocos[i].Cb[0][0];
+        float diff_Cr = blocos[i].Cr[0][0];
+
+        // Reconstitui os valores originais
+        blocos[i].Y[0][0] = diff_Y + DC_Y;
+        blocos[i].Cb[0][0] = diff_Cb + DC_CB;
+        blocos[i].Cr[0][0] = diff_Cr + DC_CR;
+
+        // Atualiza valores para o próximo bloco
+        DC_Y = blocos[i].Y[0][0];
+        DC_CB = blocos[i].Cb[0][0];
+        DC_CR = blocos[i].Cr[0][0];
+    }
+}
+
 // Função principal para descompressão do JPEG
 void descomprimirJPEGSemPerdas(const char* input_compressed_jpeg, const char* output_bmp) {
     // 1. Abrir arquivo de entrada e ler o cabeçalho
@@ -162,4 +185,7 @@ void descomprimirJPEGSemPerdas(const char* input_compressed_jpeg, const char* ou
     for (int i = 0; i < header.dataSize; i++) {
         decodificarBloco(in, tabela_Y, tabela_Cb, tabela_Cr, &blocos[i]);
     }
+    
+    // 4. Aplicar DCPM Inversa
+    DCPMInversa(blocos, header.dataSize);
 }
