@@ -3,8 +3,6 @@
 
 #include "jpeg.h"
 
-void DPCM(BlocoYCbCr* blocos, int num_blocos);
-void comprimeBloco(BlocoYCbCr bloco, TabelaHuffman* tabela_Y, TabelaHuffman* tabela_Cb, TabelaHuffman* tabela_Cr, FILE* output);
 void comprimirJPEGSemPerdas(const char* input_bmp, const char* output_jpeg);
 
 #endif
