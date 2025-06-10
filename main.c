@@ -30,35 +30,35 @@ int main() {
     saveBmpImage("output.bmp", FileHeader, InfoHeader, Image);
 
     // 5. Fazer um menu que permite ao usuário selecionar a opção que ele quer
-    printf("====== Escolha a opção que deseja: =====\n");
+    printf("====== Escolha a opcao que deseja: =====\n");
     printf("1. Comprimir JPEG sem perdas\n");
     printf("2. Comprimir JPEG com perdas\n");
     printf("3. Descomprimir JPEG sem perdas\n");
     printf("4. Descomprimir JPEG com perdas\n");
-    printf("0. Cancelar operação\n");
+    printf("0. Cancelar operacao\n");
 
     int opcao;
-    printf("Digite sua opção: ");
+    printf("Digite sua opcao: ");
     scanf("%d", &opcao);
 
     switch (opcao) {
         case 1:
-            printf("Iniciando compressão sem perdas...");
+            printf("Iniciando compressao sem perdas...");
             comprimirJPEGSemPerdas(IMG, OUTPUT_JPEG);
             printf("Imagem comprimida com sucesso em: %s\n", OUTPUT_JPEG);
             break;
         case 2:
-            printf("Iniciando compressão com perdas...");
+            printf("Iniciando compressao com perdas...");
             // comprimirJPEGComPerdas(IMG, OUTPUT_JPEG);
             printf("Imagem comprimida com sucesso em: %s\n", OUTPUT_JPEG);
             break;
         case 3:
-            printf("Iniciando descompressão sem perdas...");
+            printf("Iniciando descompressao sem perdas...");
             descomprimirJPEGSemPerdas(OUTPUT_JPEG, OUTPUT_BMP);
             // printf("Imagem descomprimida com sucesso em: %s\n", OUTPUT_JPEG);
             break;
         case 4:
-            printf("Iniciando descompressão com perdas...");
+            printf("Iniciando descompressao com perdas...");
             // descomprimirJPEGSemPerdas(OUTPUT_JPEG, OUTPUT_BMP);
             // printf("Imagem descomprimida com sucesso em: %s\n", OUTPUT_JPEG);
             break;

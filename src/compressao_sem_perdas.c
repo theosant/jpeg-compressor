@@ -82,6 +82,26 @@ void comprimeBloco(BlocoYCbCr bloco, TabelaHuffman* tabela_Y,
     }
 }
 
+// Função auxiliar para escrever no arquivo .jls
+void escreverTabelaHuffman(TabelaHuffman* tabela, FILE* output) {
+    // tamanho fixo de 256
+    fwrite(&tabela->tamanho, sizeof(unsigned), 1, output);
+
+    // Escreve cada símbolo
+    for (unsigned i = 0; i < tabela->tamanho; i++){
+        fwrite(&i, sizeof(int), 1, output);
+
+        // Escreve o comprimento do código (0 se não existir)
+        int comprimento = tabela->codigos[i] ? strlen(tabela->codigos[i]) : 0;
+        fwrite(&comprimento, sizeof(int), 1, output);
+
+        // Escreve o código
+        if (comprimento > 0) {
+            fwrite(tabela->codigos[i], sizeof(char), comprimento, output);
+        }
+    }
+}
+
 // Função principal para comprimir JPEG sem perdas
 void comprimirJPEGSemPerdas(const char* input_bmp, const char* output_jpeg) {
     printf("\n[DEBUG] Iniciando compressao JPEG sem perdas...\n");
@@ -131,6 +151,11 @@ void comprimirJPEGSemPerdas(const char* input_bmp, const char* output_jpeg) {
 
     // Escrever cabeçalho
     fwrite(&header, sizeof(JLSHeader), 1, out);
+
+    // Escrever tabelas Huffan
+    escreverTabelaHuffman(tabela_Y, out);
+    escreverTabelaHuffman(tabela_Cb, out);
+    escreverTabelaHuffman(tabela_Cr, out);
     
     // Comprimir cada bloco
     printf("[DEBUG] Iniciando compressao dos blocos...\n");

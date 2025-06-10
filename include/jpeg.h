@@ -12,6 +12,13 @@ typedef struct {
     float Y, Cb, Cr;
 } PixelYCbCr;
 
+typedef struct {
+    char name[4];        // Identificador do arquivo
+    uint32_t width;       // largura da imagem
+    uint32_t height;      // altura da imagem
+    uint32_t dataSize;    // tamanho dos dados comprimidos em bytes
+} JLSHeader;
+
 PixelYCbCr* convertRgbToYCbCr(Pixel *input, BitmapInfoHeader infoHeader);
 BlocoYCbCr* dividirBlocos(PixelYCbCr* imagem, int largura, int altura, int* num_blocos);
 
