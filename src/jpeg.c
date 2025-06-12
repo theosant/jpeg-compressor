@@ -4,7 +4,6 @@
 #include <math.h>
 
 
-
 PixelYCbCr* convertRgbToYCbCr(Pixel *input, BitmapInfoHeader infoHeader) {
     int totalPixels = infoHeader.width * infoHeader.height;
     PixelYCbCr *converted = malloc(totalPixels * sizeof(PixelYCbCr));
@@ -156,7 +155,7 @@ void dctBlock8x8Matrix(double P[BLOCK_SIZE][BLOCK_SIZE], double F[BLOCK_SIZE][BL
         for (int j = 0; j < BLOCK_SIZE; j++) {
             F[i][j] = 0.0;
             for (int k = 0; k < BLOCK_SIZE; k++) {
-                F[i][j] += temp[i][k] * C[k][j]; 
+                F[i][j] += temp[i][k] * C[j][k]; 
             }
         }
     }
@@ -256,3 +255,36 @@ void applyIdctToImage(double* dctCoeffs, int width, int height, double* image, d
     }
 }
 
+void quantizeImage(double* dctCoeffs, int* quantized, int width, int height, const int Q[8][8], double k) {
+    for (int i = 0; i < height; i += 8) {
+        for (int j = 0; j < width; j += 8) {
+            for (int u = 0; u < 8; u++) {
+                for (int v = 0; v < 8; v++) {
+                    int xi = i + u;
+                    int yj = j + v;
+                    if (xi < height && yj < width) {
+                        int idx = xi * width + yj;
+                        quantized[idx] = round(dctCoeffs[idx] / (k * Q[u][v]));
+                    }
+                }
+            }
+        }
+    }
+}
+
+void dequantizeImage(int* quantized, double* dctCoeffs, int width, int height, const int Q[8][8], double k) {
+    for (int i = 0; i < height; i += 8) {
+        for (int j = 0; j < width; j += 8) {
+            for (int u = 0; u < 8; u++) {
+                for (int v = 0; v < 8; v++) {
+                    int xi = i + u;
+                    int yj = j + v;
+                    if (xi < height && yj < width) {
+                        int idx = xi * width + yj;
+                        dctCoeffs[idx] = (double)quantized[idx] * (k * Q[u][v]);
+                    }
+                }
+            }
+        }
+    }
+}

@@ -16,5 +16,6 @@ void upSampling(double *CbDown, double *CrDown, BitmapInfoHeader infoHeader, dou
 void precalcC(double C[BLOCK_SIZE][BLOCK_SIZE]);
 void applyDctToImage(double* image, int width, int height, double* dctCoeffs, double C[BLOCK_SIZE][BLOCK_SIZE]);
 void applyIdctToImage(double* dctCoeffs, int width, int height, double* image, double C[BLOCK_SIZE][BLOCK_SIZE]);
-
+void quantizeImage(double* dctCoeffs, int* quantized, int width, int height, const int Q[8][8], double k);
+void dequantizeImage(int* quantized, double* dctCoeffs, int width, int height, const int Q[8][8], double k);
 #endif

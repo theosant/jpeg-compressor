@@ -18,7 +18,7 @@ all: $(TARGET)
 
 # Compilação do executável
 $(TARGET): $(BIN_DIR) $(SRCS)
-	$(CC) $(CFLAGS) -o $(TARGET) $(SRCS)
+	$(CC) $(CFLAGS) -o $(TARGET) $(SRCS) -lm
 
 # Criação da pasta bin, se necessário
 $(BIN_DIR):
