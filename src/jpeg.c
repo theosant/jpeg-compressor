@@ -81,6 +81,19 @@ BlocoYCbCr* dividirBlocos(PixelYCbCr* imagem, int largura, int altura, int* num_
             }
         }
     }
+
+    for (int i = 0; i < *num_blocos; i++) {
+        for (int y = 0; y < 8; y++) {
+            for (int x = 0; x < 8; x++) {
+                if (blocos[i].Y[y][x] < 0 || blocos[i].Y[y][x] > 255 ||
+                    blocos[i].Cb[y][x] < 0 || blocos[i].Cb[y][x] > 255 ||
+                    blocos[i].Cr[y][x] < 0 || blocos[i].Cr[y][x] > 255) {
+                    printf("[WARNING DIVISAO] Bloco %d (%d,%d) - Y=%.2f, Cb=%.2f, Cr=%.2f\n",
+                        i, y, x, blocos[i].Y[y][x], blocos[i].Cb[y][x], blocos[i].Cr[y][x]);
+                }
+            }
+        }
+    }
     
     return blocos;
 }

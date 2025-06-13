@@ -4,32 +4,27 @@
 #include "include/descompressao_sem_perdas.h"
 
 #define IMG "test_images/paisagem_32x32.bmp"
-#define OUTPUT_JPEG "paisagem_compressed.jls"  // JLS = JPEG Lossless
+#define OUTPUT_JPEG "paisagem_compressed.jls"
 #define OUTPUT_BMP "paisagem_decompressed.bmp"
 
 int main() {
     FILE *input;
  
-    // 1. Abre e verifica o arquivo BMP de entrada
     if(!(input = fopen(IMG, "rb"))) {
         printf("Error: could not open input file.");
         exit(1);
     }
 
-    // 2. Lê os cabeçalhos do BMP
     BitmapFileHeader FileHeader;      
     BitmapInfoHeader InfoHeader; 
     loadBmpHeaders(input, &FileHeader, &InfoHeader);
     printHeaders(&FileHeader, &InfoHeader);
    
-    // 3. Carrega os pixels da imagem
     Pixel* Image = loadBmpImage(input, InfoHeader);
     fclose(input);
 
-    // 4. Salva uma cópia do BMP original para verificação
     saveBmpImage("output.bmp", FileHeader, InfoHeader, Image);
 
-    // 5. Fazer um menu que permite ao usuário selecionar a opção que ele quer
     printf("====== Escolha a opcao que deseja: =====\n");
     printf("1. Comprimir JPEG sem perdas\n");
     printf("2. Comprimir JPEG com perdas\n");
@@ -67,8 +62,6 @@ int main() {
             exit(0);
     }
 
-    // 6. Libera a memória
     free(Image);
-    
     return 0;
 }

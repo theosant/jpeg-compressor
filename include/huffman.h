@@ -1,64 +1,65 @@
-#ifndef HUFFAMN_H
+#ifndef HUFFMAN_H
 #define HUFFMAN_H
 
-#include <stdint.h>
-#include <stdlib.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <math.h>
 
-typedef enum {
-    COMP_Y = 1,  // Luminância
-    COMP_CB = 2, // Crominância Azul
-    COMP_CR = 3  // Crominância Vermelha
-} Componente;
+// --- Constantes ---
+// O tamanho do nosso alfabeto de símbolos. Para um processo sem perdas
+// com predição, o erro geralmente fica em um intervalo como [-255, 255].
+// O offset garante que todos os índices do array de frequência sejam positivos.
+#define HUFFMAN_TAMANHO 511
+#define HUFFMAN_OFFSET 255
 
+// Componentes da imagem
+#define COMP_Y 'Y'
+#define COMP_CB 'C'
+#define COMP_CR 'R'
+
+// --- Estruturas de Dados ---
+
+// A estrutura BlocoYCbCr foi mantida, mas seus membros agora são do tipo 'int'
+// para garantir que a compressão seja sem perdas (lossless).
 typedef struct {
-    float Y[8][8];
-    float Cb[8][8];
-    float Cr[8][8];
+    int Y[8][8];
+    int Cb[8][8];
+    int Cr[8][8];
 } BlocoYCbCr;
 
-/* Decodifica código -> símbolo, ou seja, gera a tabela de códigos */
-typedef struct HuffmanNode HuffmanNode;
-
-struct HuffmanNode{
+// Nó da árvore de Huffman
+typedef struct HuffmanNode {
     int valor;
     unsigned frequencia;
-    HuffmanNode* esquerda;
-    HuffmanNode* direita;
-};
+    struct HuffmanNode *esquerda, *direita;
+} HuffmanNode;
 
-/* Mapeia símbolo -> código, ou seja, susbtitui símbolos por códigos */
+// Min Heap para construir a árvore de Huffman
 typedef struct {
-    int* simbolos;
-    char** codigos;
-    unsigned tamanho;
-} TabelaHuffman;
-
-/* Estrtura para construir a árvore de forma mais eficiente*/
-typedef struct {
-    HuffmanNode** nos;
     unsigned tamanho;
     unsigned capacidade;
+    HuffmanNode** nos;
 } MinHeap;
 
-/* Funções da tabela*/
-TabelaHuffman* construirTabelaHuffman(BlocoYCbCr* blocos, int num_blocos, char componente);
-void destruirTabelaHuffman(TabelaHuffman *tabela);
-void comprimirDadosHuffman(const int* dados, unsigned tamanho, 
-    const TabelaHuffman* tabela, unsigned char** bufferSaida, 
-    unsigned* tamanhoSaida);
+// Tabela de códigos de Huffman
+typedef struct {
+    char** codigos;
+    int* simbolos;
+    unsigned tamanho;
+    HuffmanNode* raiz; // Raiz da árvore para descompressão
+} TabelaHuffman;
 
-/* Funções da árvore*/
-HuffmanNode* criarNo(int valor, unsigned frequencia);
-HuffmanNode* construirArvoreHuffman(const int* dados, unsigned tamanho);
+
+// --- Protótipos das Funções ---
+
+// Funções da Árvore e Tabela de Huffman
+TabelaHuffman* construirTabelaHuffman(BlocoYCbCr* blocos, int num_blocos, char componente);
+void escreverTabelaHuffman(TabelaHuffman* tabela, FILE* output);
+TabelaHuffman* lerTabelaHuffman(FILE* input);
+void destruirTabelaHuffman(TabelaHuffman* tabela);
+const char* buscarCodigo(TabelaHuffman* tabela, int valor);
+HuffmanNode* reconstruirArvore(TabelaHuffman* tabela);
 void liberarArvoreHuffman(HuffmanNode* raiz);
 
-/* Funções min-heap*/
-MinHeap* criarMinHeap(unsigned capacidade);
-void inserirMinHeap(MinHeap* heap, HuffmanNode* no);
-HuffmanNode* extrairMin(MinHeap* heap);
-void destruirMinHeap(MinHeap* heap);
-
-#endif
+#endif // HUFFMAN_H
