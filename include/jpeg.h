@@ -8,16 +8,20 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdint.h>
+#include <math.h>
 
 typedef struct {
     float Y, Cb, Cr;
 } PixelYCbCr;
 
 typedef struct {
-    char name[4];        // Identificador do arquivo
-    uint32_t width;       // largura da imagem
-    uint32_t height;      // altura da imagem
-    uint32_t dataSize;    // tamanho dos dados comprimidos em bytes
+    char name[4];                   // Assinatura do arquivo, ex: "JLS1"
+    unsigned int width;             // Largura da imagem
+    unsigned int height;            // Altura da imagem
+    unsigned int dataSize;          // Número de blocos 8x8
+    BitmapFileHeader bmp_file_header;
+    BitmapInfoHeader bmp_info_header;
+    
 } JLSHeader;
 
 PixelYCbCr* convertRgbToYCbCr(Pixel *input, BitmapInfoHeader infoHeader);

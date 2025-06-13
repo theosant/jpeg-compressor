@@ -10,9 +10,9 @@ PixelYCbCr* convertRgbToYCbCr(Pixel *input, BitmapInfoHeader infoHeader) {
         double g = input[i].G;
         double b = input[i].B;
 
-        converted[i].Y  = 0.299 * r + 0.587 * g + 0.114 * b;
-        converted[i].Cb = -0.1687 * r - 0.3313 * g + 0.5 * b + 128;
-        converted[i].Cr =  0.5 * r - 0.4187 * g - 0.0813 * b + 128;
+        converted[i].Y = round(0.299 * r + 0.587 * g + 0.114 * b);
+        converted[i].Cb = round(-0.168736 * r - 0.331264 * g + 0.5 * b + 128);
+        converted[i].Cr = round(0.5 * r - 0.418688 * g - 0.081312 * b + 128);
     }
 
     return converted;
@@ -28,32 +28,33 @@ Pixel* convertYCbCrToRgb(PixelYCbCr* imagem_ycbcr, int largura, int altura) {
     }
 
     for (int i = 0; i < total_pixels; i++) {
-        // Obter componentes YCbCr
-        float Y = imagem_ycbcr[i].Y;
-        float Cb = imagem_ycbcr[i].Cb - 128.0f;  // Centraliza em 0
-        float Cr = imagem_ycbcr[i].Cr - 128.0f;  // Centraliza em 0
+        float Y  = imagem_ycbcr[i].Y;
+        float Cb = imagem_ycbcr[i].Cb;
+        float Cr = imagem_ycbcr[i].Cr;
+        
+        float Cb_centered = Cb - 128.0f;
+        float Cr_centered = Cr - 128.0f;
 
-        // Fórmulas de conversão padrão ITU-R BT.601
-        float R = Y + 1.402f * Cr;
-        float G = Y - 0.344136f * Cb - 0.714136f * Cr;
-        float B = Y + 1.772f * Cb;
+        // Fórmulas de conversão padrão (ITU-R BT.601)
+        float R = Y + 1.402f * Cr_centered;
+        float G = Y - 0.344136f * Cb_centered - 0.714136f * Cr_centered;
+        float B = Y + 1.772f * Cb_centered;
 
-        // Garantir que os valores estão no intervalo [0, 255]
-        imagem_rgb[i].R = (unsigned char)(R < 0 ? 0 : (R > 255 ? 255 : R));
-        imagem_rgb[i].G = (unsigned char)(G < 0 ? 0 : (G > 255 ? 255 : G));
-        imagem_rgb[i].B = (unsigned char)(B < 0 ? 0 : (B > 255 ? 255 : B));
+        imagem_rgb[i].R = (unsigned char)(fmax(0, fmin(255, R)));
+        imagem_rgb[i].G = (unsigned char)(fmax(0, fmin(255, G)));
+        imagem_rgb[i].B = (unsigned char)(fmax(0, fmin(255, B)));
     }
 
     return imagem_rgb;
 }
 
 BlocoYCbCr* dividirBlocos(PixelYCbCr* imagem, int largura, int altura, int* num_blocos) {
-    // Calcula quantos blocos serão necessários na horizontal e vertical (arredonda para cima a divisão)
     int blocos_largura = (largura + 7) / 8;
     int blocos_altura = (altura + 7) / 8;
     *num_blocos = blocos_largura * blocos_altura;
     
     BlocoYCbCr* blocos = malloc(*num_blocos * sizeof(BlocoYCbCr));
+    if (!blocos) { return NULL; }
     
     for (int by = 0; by < blocos_altura; by++) {
         for (int bx = 0; bx < blocos_largura; bx++) {
@@ -61,35 +62,31 @@ BlocoYCbCr* dividirBlocos(PixelYCbCr* imagem, int largura, int altura, int* num_
             
             for (int y = 0; y < 8; y++) {
                 for (int x = 0; x < 8; x++) {
-                    // Calcula a posição do pixel na imagem original
                     int px = bx * 8 + x;
                     int py = by * 8 + y;
                     
                     if (px < largura && py < altura) {
-                        // Se estiver dentro dos limites, copia o pixel
                         int idx = py * largura + px;
-                        bloco->Y[y][x] = imagem[idx].Y;
-                        bloco->Cb[y][x] = imagem[idx].Cb;
-                        bloco->Cr[y][x] = imagem[idx].Cr;
-                    } else {
-                        // Padding com últimos valores válidos
-                        bloco->Y[y][x] = bloco->Y[y][x-1];
-                        bloco->Cb[y][x] = bloco->Cb[y][x-1];
-                        bloco->Cr[y][x] = bloco->Cr[y][x-1];
-                    }
-                }
-            }
-        }
-    }
+                        bloco->Y[y][x]  = round(imagem[idx].Y);
+                        bloco->Cb[y][x] = round(imagem[idx].Cb);
+                        bloco->Cr[y][x] = round(imagem[idx].Cr);
 
-    for (int i = 0; i < *num_blocos; i++) {
-        for (int y = 0; y < 8; y++) {
-            for (int x = 0; x < 8; x++) {
-                if (blocos[i].Y[y][x] < 0 || blocos[i].Y[y][x] > 255 ||
-                    blocos[i].Cb[y][x] < 0 || blocos[i].Cb[y][x] > 255 ||
-                    blocos[i].Cr[y][x] < 0 || blocos[i].Cr[y][x] > 255) {
-                    printf("[WARNING DIVISAO] Bloco %d (%d,%d) - Y=%.2f, Cb=%.2f, Cr=%.2f\n",
-                        i, y, x, blocos[i].Y[y][x], blocos[i].Cb[y][x], blocos[i].Cr[y][x]);
+                    } else {
+                        // Lógica de padding
+                        if (x > 0) {
+                            bloco->Y[y][x] = bloco->Y[y][x-1];
+                            bloco->Cb[y][x] = bloco->Cb[y][x-1];
+                            bloco->Cr[y][x] = bloco->Cr[y][x-1];
+                        } else if (y > 0) {
+                             bloco->Y[y][x] = bloco->Y[y-1][x];
+                             bloco->Cb[y][x] = bloco->Cb[y-1][x];
+                             bloco->Cr[y][x] = bloco->Cr[y-1][x];
+                        } else {
+                            bloco->Y[y][x] = 128; // Cinza
+                            bloco->Cb[y][x] = 128;
+                            bloco->Cr[y][x] = 128;
+                        }
+                    }
                 }
             }
         }

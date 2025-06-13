@@ -22,11 +22,10 @@ void DPCM(BlocoYCbCr* blocos, int num_blocos) {
 }
 
 
-// Função de processamento de componentes simplificada.
+// Função de processamento de componentes
 void processarComponente(int componente[8][8], TabelaHuffman* tabela, unsigned char* buffer, int* pos, FILE* output) {
     for (int y = 0; y < 8; y++) {
         for (int x = 0; x < 8; x++) {
-            // Leitura direta do valor inteiro, sem round().
             int valor = componente[y][x];
             
             const char* codigo = buscarCodigo(tabela, valor);
@@ -34,8 +33,6 @@ void processarComponente(int componente[8][8], TabelaHuffman* tabela, unsigned c
                 fprintf(stderr, "[ERRO] Valor %d não encontrado na tabela Huffman!\n", valor);
                 exit(EXIT_FAILURE);
             }
-            
-            printf("[COMPRESS] valor=%d -> codigo=%s\n", valor, codigo);
 
             // Escreve os bits no buffer
             for (int i = 0; codigo[i] != '\0'; i++) {
@@ -65,13 +62,12 @@ void comprimeBloco(BlocoYCbCr bloco, TabelaHuffman* tabela_Y, TabelaHuffman* tab
 void comprimirJPEGSemPerdas(const char* input_bmp, const char* output_jpeg) {
     printf("\n[DEBUG] Iniciando compressao JPEG sem perdas...\n");
     
-    // 1. Carregar a imagem BMP
+    // 1. Carregar a imagem BMP e seus cabeçallhos
     FILE* fp = fopen(input_bmp, "rb");
     if (!fp) {
         perror("Erro ao abrir arquivo BMP");
         return;
     }
-    
     BitmapFileHeader fileHeader;
     BitmapInfoHeader infoHeader;
     loadBmpHeaders(fp, &fileHeader, &infoHeader);
@@ -92,7 +88,7 @@ void comprimirJPEGSemPerdas(const char* input_bmp, const char* output_jpeg) {
     fwrite(&num_blocos, sizeof(int), 1, f_orig);
     fwrite(blocos_originais, sizeof(BlocoYCbCr), num_blocos, f_orig);
     fclose(f_orig);
-    free(blocos_originais); // Libera a cópia após salvar
+    free(blocos_originais);
     
     // 5. Aplicar DPCM para codificar as diferenças dos coeficientes DC
     DPCM(blocos, num_blocos);
@@ -115,6 +111,9 @@ void comprimirJPEGSemPerdas(const char* input_bmp, const char* output_jpeg) {
     header.width = infoHeader.width;
     header.height = infoHeader.height;
     header.dataSize = num_blocos;
+    header.bmp_file_header = fileHeader;
+    header.bmp_info_header = infoHeader;
+
     fwrite(&header, sizeof(JLSHeader), 1, out);
 
     // 9. Escrever as tabelas de Huffman no arquivo
@@ -123,11 +122,8 @@ void comprimirJPEGSemPerdas(const char* input_bmp, const char* output_jpeg) {
     escreverTabelaHuffman(tabela_Cr, out);
     
     // 10. Comprimir os dados dos blocos em um fluxo de bits contínuo
-    
-    // ----> ESTADO DO BITSTREAM CENTRALIZADO <----
     unsigned char buffer_escrita = 0;
     int pos_bit_escrita = 0;
-
     printf("[DEBUG] Comprimindo %d blocos...\n", num_blocos);
     for (int i = 0; i < num_blocos; i++) {
         comprimeBloco(blocos[i], tabela_Y, tabela_Cb, tabela_Cr, 

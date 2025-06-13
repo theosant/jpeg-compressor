@@ -43,15 +43,26 @@ BitmapInfoHeader readInfoHeader(FILE *fp) {
 }
 
 Pixel* loadBmpImage(FILE *fp, BitmapInfoHeader infoHeader) {
-    int totalPixels = infoHeader.width * infoHeader.height;
+    int width = infoHeader.width;
+    int height = infoHeader.height;
+    int totalPixels = width * height;
     Pixel *image = malloc(totalPixels * sizeof(Pixel));
 
-    fseek(fp, 54, SEEK_SET); // skip header (54 bytes)
+    // Calcula o padding
+    // Cada linha deve ser um múltiplo de 4 bytes
+    int padding = (4 - (width * 3) % 4) % 4;
 
-    for (int i = 0; i < totalPixels; i++) {
-        image[i].B = fgetc(fp);
-        image[i].G = fgetc(fp);
-        image[i].R = fgetc(fp);
+    fseek(fp, 54, SEEK_SET); // Pula o cabeçalho
+
+    for (int y = 0; y < height; y++) {
+        for (int x = 0; x < width; x++) {
+            int idx = y * width + x;
+            image[idx].B = fgetc(fp);
+            image[idx].G = fgetc(fp);
+            image[idx].R = fgetc(fp);
+        }
+        // Pula os bytes de padding no final da linha
+        fseek(fp, padding, SEEK_CUR);
     }
 
     return image;
@@ -120,23 +131,32 @@ void writeInfoHeader(FILE *fp, BitmapInfoHeader infoHeader) {
 void saveBmpImage(const char *filename, BitmapFileHeader fileHeader, BitmapInfoHeader infoHeader, Pixel *image) {
     FILE *fp = fopen(filename, "wb");
     if (!fp) {
-        perror("Error opening output file");
+        perror("Erro ao abrir arquivo de saida");
         return;
     }
 
-    int totalPixels = infoHeader.width * infoHeader.height;
+    int width = infoHeader.width;
+    int height = infoHeader.height;
+
+    int padding = (4 - (width * 3) % 4) % 4;
 
     writeFileHeader(fp, fileHeader);
     writeInfoHeader(fp, infoHeader);
-    // talvez precise de padding
-    // talvez esteja de ponta cabeça
-    for (int i = 0; i < totalPixels; i++) {
-        fputc(image[i].B, fp);
-        fputc(image[i].G, fp);
-        fputc(image[i].R, fp);
+
+    unsigned char paddingByte = 0;
+
+    for (int y = 0; y < height; y++) {
+        for (int x = 0; x < width; x++) {
+            int idx = y * width + x;
+            fputc(image[idx].B, fp);
+            fputc(image[idx].G, fp);
+            fputc(image[idx].R, fp);
+        }
+        // Escreve os bytes de padding no final da linha
+        for (int k = 0; k < padding; k++) {
+            fputc(paddingByte, fp);
+        }
     }
 
     fclose(fp);
 }
-
-

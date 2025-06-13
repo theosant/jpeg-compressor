@@ -1,3 +1,5 @@
 # Ignorar executáveis do Windows
 *.exe
 *.bin
+*.jls
+*.bmp

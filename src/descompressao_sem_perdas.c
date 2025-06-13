@@ -1,36 +1,5 @@
 #include "descompressao_sem_perdas.h"
 
-// Função para debug: verificar perdas
-void verificarPerdas(BlocoYCbCr* originais, BlocoYCbCr* reconstruidos, int num_blocos) {
-    for (int i = 0; i < num_blocos; i++) {
-        for (int y = 0; y < 8; y++) {
-            for (int x = 0; x < 8; x++) {
-                if (originais[i].Y[y][x] != reconstruidos[i].Y[y][x] ||
-                    originais[i].Cb[y][x] != reconstruidos[i].Cb[y][x] ||
-                    originais[i].Cr[y][x] != reconstruidos[i].Cr[y][x]) {
-                    printf("[ERRO] Perda detectada no bloco %d, pos (%d,%d)! Original Y: %d, Reconstruído Y: %d\n", 
-                           i, y, x, originais[i].Y[y][x], reconstruidos[i].Y[y][x]);
-                    exit(EXIT_FAILURE);
-                }
-            }
-        }
-    }
-    printf("[SUCESSO] Nenhuma perda detectada!\n");
-}
-
-BlocoYCbCr* carregarBlocosOriginais(const char* filename, int* num_blocos_out) {
-    FILE* f = fopen(filename, "rb");
-    if (!f) {
-        perror("[ERRO] Ao abrir arquivo de blocos originais");
-        return NULL;
-    }
-    fread(num_blocos_out, sizeof(int), 1, f);
-    BlocoYCbCr* blocos = malloc(*num_blocos_out * sizeof(BlocoYCbCr));
-    fread(blocos, sizeof(BlocoYCbCr), *num_blocos_out, f);
-    fclose(f);
-    return blocos;
-}
-
 void decodificarBlocoComponente(FILE* input, HuffmanNode* raiz, int componente[8][8], unsigned char* buffer, int* pos_bit) {
     HuffmanNode* atual = raiz;
     if (!raiz) {
@@ -88,6 +57,12 @@ void DCPMInversa(BlocoYCbCr* blocos, int num_blocos) {
         DC_Y = blocos[i].Y[0][0];
         DC_CB = blocos[i].Cb[0][0];
         DC_CR = blocos[i].Cr[0][0];
+
+        if (i == 10) {
+            printf("[DESCOMPRESSAO] Bloco do pixel central (DC) apos DPCM Inversa:\n");
+            printf("  -> Y=%d, Cb=%d, Cr=%d\n", blocos[i].Y[0][0], blocos[i].Cb[0][0], blocos[i].Cr[0][0]);
+            printf("--------------------------------------------------\n");
+        }
     }
 }
 
@@ -101,6 +76,7 @@ void descomprimirJPEGSemPerdas(const char* input_jpeg, const char* output_bmp) {
         return;
     }
 
+    // 1. Lê cabeçalho JLS
     JLSHeader header;
     fread(&header, sizeof(JLSHeader), 1, input);
 
@@ -110,37 +86,31 @@ void descomprimirJPEGSemPerdas(const char* input_jpeg, const char* output_bmp) {
         return;
     }
 
+    // 2. Lê as três tabelas de Huffman do arquivo
     TabelaHuffman* tabela_Y = lerTabelaHuffman(input);
     TabelaHuffman* tabela_Cb = lerTabelaHuffman(input);
     TabelaHuffman* tabela_Cr = lerTabelaHuffman(input);
 
+    // 3. Aloca memória para os blocos
     BlocoYCbCr* blocos = malloc(header.dataSize * sizeof(BlocoYCbCr));
     if (!blocos) {
         perror("[ERRO] Falha ao alocar blocos");
         return;
     }
-
     unsigned char buffer_leitura = 0;
     int pos_bit_leitura = 8;
 
+    // 4. Decodifica cada bloco da imagem usando as tabelas de Huffman.
     printf("[DEBUG] Decodificando %u blocos...\n", header.dataSize);
     for (unsigned i = 0; i < header.dataSize; i++) {
         decodificarBloco(input, tabela_Y, tabela_Cb, tabela_Cr, &blocos[i], &buffer_leitura, &pos_bit_leitura);
     }
 
-    // DEBUG
-    int num_blocos_originais;
-
-    // Aplicar DPCM Inversa
+    // 5. Aplica a DPCM inversa para restaurar os valores DC originais.
     printf("[DEBUG] Aplicando DPCM inversa...\n");
     DCPMInversa(blocos, header.dataSize);
-    
-    BlocoYCbCr* blocos_originais_finais = carregarBlocosOriginais("temp_originais.bin", &num_blocos_originais);
-    printf("\n[VERIFICAÇÃO] Comparando blocos finais (APÓS DPCM inversa):\n");
-    verificarPerdas(blocos_originais_finais, blocos, header.dataSize);
-    free(blocos_originais_finais);
 
-    // 5. Reconstruir imagem YCbCr a partir dos blocos
+    // 6. Remonta a imagem YCbCr completa a partir dos blocos 8x8.
     printf("[DEBUG] Reconstruindo imagem YCbCr...\n");
     PixelYCbCr* ycbcr = malloc(header.width * header.height * sizeof(PixelYCbCr));
     if (!ycbcr) {
@@ -171,59 +141,14 @@ void descomprimirJPEGSemPerdas(const char* input_jpeg, const char* output_bmp) {
         }
     }
 
-    printf("[TESTE] Verificando blocos YCbCr reconstruidos:\n");
-    for (int b = 0; b < 3; b++) { // Mostra 3 primeiros blocos
-        printf("Bloco %d - Y[0][0]=%.2f, Cb[0][0]=%.2f, Cr[0][0]=%.2f\n",
-            b, blocos[b].Y[0][0], blocos[b].Cb[0][0], blocos[b].Cr[0][0]);
-        
-        // Mostra toda a matriz 8x8 do componente Y do primeiro bloco
-        if (b == 0) {
-            printf("Matriz Y completa do Bloco 0:\n");
-            for (int i = 0; i < 8; i++) {
-                for (int j = 0; j < 8; j++) {
-                    printf("%6.1f ", blocos[b].Y[i][j]);
-                }
-                printf("\n");
-            }
-        }
-    }
-
-    int blocos_por_coluna = (header.height + 7) / 8;
-    printf("\n[TESTE] Dimensoes:\n");
-    printf("Blocos totais: %d\n", header.dataSize);
-    printf("Blocos por linha: %d\n", blocos_por_linha);
-    printf("Blocos por coluna: %d\n", blocos_por_coluna);
-    printf("Calculado: %d x %d = %d blocos\n", 
-        blocos_por_linha, blocos_por_coluna, blocos_por_linha * blocos_por_coluna);
-
-    assert((size_t)header.dataSize == (size_t)(blocos_por_linha * blocos_por_coluna));
-
-    // 6. Converter YCbCr para RGB
+    // 7. Converte a imagem YCbCr de volta para o formato RGB.
     Pixel* rgb = convertYCbCrToRgb(ycbcr, header.width, header.height);
 
-    // 7. Salvando as mensagens
-    BitmapFileHeader fileHeader = {
-        .type = 0x4D42, // 'BM'
-        .size = sizeof(BitmapFileHeader) + sizeof(BitmapInfoHeader) + (header.width * header.height * 3),
-        .offsetBits = sizeof(BitmapFileHeader) + sizeof(BitmapInfoHeader)
-    };
+    // 8. Salvando a imagem
+    printf("[DEBUG] Salvando imagem BMP final com cabeçalhos originais...\n");
+    saveBmpImage(output_bmp, header.bmp_file_header, header.bmp_info_header, rgb);
 
-    BitmapInfoHeader infoHeader = {
-        .size = sizeof(BitmapInfoHeader),
-        .width = header.width,
-        .height = header.height,
-        .planes = 1,
-        .bitCount = 24,
-        .compression = 0,
-        .imageSize = header.width * header.height * 3,
-        .xResolution = 0,
-        .yResolution = 0,
-        .colorsUsed = 0,
-        .importantColors = 0
-    };
-    saveBmpImage(output_bmp, fileHeader, infoHeader, rgb);
-
-    // [9] Liberar memória
+    // 9. Liberar memória
     free(blocos);
     free(ycbcr);
     free(rgb);
