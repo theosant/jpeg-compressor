@@ -1,59 +1,75 @@
-# Configurações básicas
-CC = gcc
-CFLAGS = -Wall -Wextra -std=c99 -I$(INC_DIR)
-LDFLAGS = -mconsole -lm
-DEBUG_FLAGS = -g
-RELEASE_FLAGS = -O2
+# Detectar sistema operacional
+ifeq ($(OS),Windows_NT)
+    RM = if exist $(1) rmdir /s /q $(1)
+    MKDIR = if not exist $(1) mkdir $(1)
+    EXEC = $(TARGET).exe
+    SEP = \\
+else
+    RM = rm -rf $(1)
+    MKDIR = mkdir -p $(1)
+    EXEC = ./$(TARGET)
+    SEP = /
+endif
 
 # Diretórios
 SRC_DIR = src
 INC_DIR = include
 BIN_DIR = bin
-OBJ_DIR = $(BIN_DIR)\obj
+OBJ_DIR = $(BIN_DIR)$(SEP)obj
 
-# Arquivos fonte e objetos
-SRCS = $(wildcard $(SRC_DIR)/*.c) ./main.c
-OBJS = $(patsubst $(SRC_DIR)/%.c,$(OBJ_DIR)/%.o,$(SRCS))
+# Compilador e flags
+CC = gcc
+CFLAGS = -Wall -Wextra -std=c99 -I$(INC_DIR)
+LDFLAGS = -lm
+
+DEBUG_FLAGS = -g
+RELEASE_FLAGS = -O2
+
+# Arquivos
+SRCS = $(wildcard $(SRC_DIR)/*.c) main.c
+OBJS = $(patsubst $(SRC_DIR)/%.c, $(OBJ_DIR)/%.o, $(SRCS))
 DEPS = $(wildcard $(INC_DIR)/*.h)
 
-# Nome do executável
-TARGET = $(BIN_DIR)\main.exe
+# Nome do executável (sem extensão aqui)
+TARGET = $(BIN_DIR)$(SEP)main
 
-# Regra principal (release por padrão)
+# Regra padrão
 all: release
 
-# Build de release
 release: CFLAGS += $(RELEASE_FLAGS)
-release: $(TARGET)
+release: $(EXEC)
 
-# Build para debug
 debug: CFLAGS += $(DEBUG_FLAGS)
-debug: $(TARGET)
+debug: $(EXEC)
 
-# Link do executável
-$(TARGET): $(OBJS)
+# Linkagem
+$(EXEC): $(OBJS) | $(BIN_DIR)
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^
 
-# Compilação dos objetos
+# Compilar objetos
 $(OBJ_DIR)/%.o: $(SRC_DIR)/%.c $(DEPS) | $(OBJ_DIR)
 	$(CC) $(CFLAGS) -c -o $@ $<
 
-# Criação dos diretórios necessários (compatível com Windows)
-$(BIN_DIR) $(OBJ_DIR):
-	if not exist "$@" mkdir "$@"
+# Criação de diretórios
+$(BIN_DIR):
+	$(call MKDIR,$@)
+
+$(OBJ_DIR):
+	$(call MKDIR,$@)
 
 # Execução
 run: release
-	$(TARGET)
+	$(EXEC)
 
-# Limpeza (compatível com Windows)
+# Limpeza
 clean:
-	if exist "$(BIN_DIR)" rmdir /s /q "$(BIN_DIR)"
+	$(call RM,$(BIN_DIR))
 
-# Informações do projeto
+# Info
 info:
-	@echo Sources: $(SRCS)
-	@echo Objects: $(OBJS)
-	@echo Dependencies: $(DEPS)
+	@echo OS: $(OS)
+	@echo Executável: $(EXEC)
+	@echo Fontes: $(SRCS)
+	@echo Objetos: $(OBJS)
 
 .PHONY: all release debug run clean info

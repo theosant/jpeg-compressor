@@ -133,7 +133,7 @@ void saveBmpImage(const char *filename, BitmapFileHeader fileHeader, BitmapInfoH
     for (int i = 0; i < totalPixels; i++) {
         fputc(image[i].B, fp);
         fputc(image[i].G, fp);
-        fputc(image[i].R, fp);
+        fputc(image[i].R, fp); 
     }
 
     fclose(fp);

@@ -1,2 +1,5 @@
 # Ignorar executáveis do Windows
 *.exe
+bin/
+output.bmp
+.vscode/
