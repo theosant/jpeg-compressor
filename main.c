@@ -43,7 +43,6 @@ int main(){
     // 2. Lê os cabeçalhos do BMP
     BitmapFileHeader FileHeader;      
     BitmapInfoHeader InfoHeader; 
-    loadBmpHeaders (input, &FileHeader, &InfoHeader);
     loadBmpHeaders(input, &FileHeader, &InfoHeader);
     printHeaders(&FileHeader, &InfoHeader);
    
@@ -88,7 +87,52 @@ int main(){
     quantizeImage(dctCoeffs_Cb, quantized_Cb, width_chroma, height_chroma, CHROMINANCE_Q_TABLE, K_FACTOR);
     quantizeImage(dctCoeffs_Cr, quantized_Cr, width_chroma, height_chroma, CHROMINANCE_Q_TABLE, K_FACTOR);
 
+   // 10. Zig-Zag scan
+
+    // 10.1 Calcula número de blocos
+    int blocosY_w = InfoHeader.width / 8, blocosY_h = InfoHeader.height / 8;
+    int blocosCb_w = width_chroma / 8, blocosCb_h = height_chroma / 8;
+    int total_blocos_Y = blocosY_w * blocosY_h;
+    int total_blocos_C = blocosCb_w * blocosCb_h;
+
+    // 10.2 Aloca saída zig-zag
+    int **zigzag_Y = malloc(total_blocos_Y * sizeof(int*));
+    int **zigzag_Cb = malloc(total_blocos_C * sizeof(int*));
+    int **zigzag_Cr = malloc(total_blocos_C * sizeof(int*));
+    for (int i = 0; i < total_blocos_Y; i++) zigzag_Y[i] = malloc(64 * sizeof(int));
+    for (int i = 0; i < total_blocos_C; i++) {
+        zigzag_Cb[i] = malloc(64 * sizeof(int));
+        zigzag_Cr[i] = malloc(64 * sizeof(int));
+    }
+
+    // 10.3 Aplica zig-zag Y
+    int idx = 0;
+    for (int y = 0; y < InfoHeader.height; y += 8) {
+        for (int x = 0; x < InfoHeader.width; x += 8) {
+            aplicarZigZagBloco(quantized_Y, InfoHeader.width, y, x, zigzag_Y[idx++]);
+        }
+    }
+
+    // 10.4 Aplica zig-zag Cb
+    idx = 0;
+    for (int y = 0; y < height_chroma; y += 8) {
+        for (int x = 0; x < width_chroma; x += 8) {
+            aplicarZigZagBloco(quantized_Cb, width_chroma, y, x, zigzag_Cb[idx++]);
+        }
+    }
+
+    // 10.5 Aplica zig-zag Cr
+    idx = 0;
+    for (int y = 0; y < height_chroma; y += 8) {
+        for (int x = 0; x < width_chroma; x += 8) {
+            aplicarZigZagBloco(quantized_Cr, width_chroma, y, x, zigzag_Cr[idx++]);
+        }
+    }
     
+    aplicarDPCMnosDCs(zigzag_Y, total_blocos_Y);
+    aplicarDPCMnosDCs(zigzag_Cb, total_blocos_C);
+    aplicarDPCMnosDCs(zigzag_Cr, total_blocos_C);
+
     double *dequantized_dct_Y = malloc(totalPixels * sizeof(double));
     double *dequantized_dct_Cb = malloc(totalPixels_chroma * sizeof(double));
     double *dequantized_dct_Cr = malloc(totalPixels_chroma * sizeof(double));
@@ -154,5 +198,13 @@ int main(){
 
     free(CbFull);
     free(CrFull);
+    for (int i = 0; i < total_blocos_Y; i++) free(zigzag_Y[i]);
+    for (int i = 0; i < total_blocos_C; i++) {
+        free(zigzag_Cb[i]);
+        free(zigzag_Cr[i]);
+    }
+    free(zigzag_Y);
+    free(zigzag_Cb);
+    free(zigzag_Cr);
     return 0;
 }

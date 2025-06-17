@@ -19,6 +19,13 @@ typedef struct {
     uint32_t dataSize;    // tamanho dos dados comprimidos em bytes
 } JLSHeader;
 
+
+typedef struct {
+    int zeros;      // número de zeros antes
+    int categoria;  // categoria JPEG (de 1 a 10)
+    int mantissa;   // valor codificado
+} RLEToken;
+
 #define BLOCK_SIZE 8
 
 PixelYCbCr* convertRgbToYCbCr(Pixel *input, BitmapInfoHeader infoHeader);
@@ -34,4 +41,5 @@ void applyDctToImage(double* image, int width, int height, double* dctCoeffs, do
 void applyIdctToImage(double* dctCoeffs, int width, int height, double* image, double C[BLOCK_SIZE][BLOCK_SIZE]);
 void quantizeImage(double* dctCoeffs, int* quantized, int width, int height, const int Q[8][8], double k);
 void dequantizeImage(int* quantized, double* dctCoeffs, int width, int height, const int Q[8][8], double k);
+void aplicarZigZagBloco(int *entrada, int largura, int x_bloco, int y_bloco, int vetor_saida[64]);
 #endif
