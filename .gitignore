@@ -3,3 +3,6 @@
 *.bin
 *.jls
 *.bmp
+bin/
+output.bmp
+.vscode/

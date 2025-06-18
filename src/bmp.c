@@ -131,31 +131,20 @@ void writeInfoHeader(FILE *fp, BitmapInfoHeader infoHeader) {
 void saveBmpImage(const char *filename, BitmapFileHeader fileHeader, BitmapInfoHeader infoHeader, Pixel *image) {
     FILE *fp = fopen(filename, "wb");
     if (!fp) {
-        perror("Erro ao abrir arquivo de saida");
+        perror("Error opening output file");
         return;
     }
 
-    int width = infoHeader.width;
-    int height = infoHeader.height;
-
-    int padding = (4 - (width * 3) % 4) % 4;
+    int totalPixels = infoHeader.width * infoHeader.height;
 
     writeFileHeader(fp, fileHeader);
     writeInfoHeader(fp, infoHeader);
-
-    unsigned char paddingByte = 0;
-
-    for (int y = 0; y < height; y++) {
-        for (int x = 0; x < width; x++) {
-            int idx = y * width + x;
-            fputc(image[idx].B, fp);
-            fputc(image[idx].G, fp);
-            fputc(image[idx].R, fp);
-        }
-        // Escreve os bytes de padding no final da linha
-        for (int k = 0; k < padding; k++) {
-            fputc(paddingByte, fp);
-        }
+    // talvez precise de padding
+    // talvez esteja de ponta cabeça
+    for (int i = 0; i < totalPixels; i++) {
+        fputc(image[i].B, fp);
+        fputc(image[i].G, fp);
+        fputc(image[i].R, fp); 
     }
 
     fclose(fp);

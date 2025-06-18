@@ -24,8 +24,19 @@ typedef struct {
     
 } JLSHeader;
 
-PixelYCbCr* convertRgbToYCbCr(Pixel *input, BitmapInfoHeader infoHeader);
-Pixel* convertYCbCrToRgb(PixelYCbCr* imagem_ycbcr, int largura, int altura);
-BlocoYCbCr* dividirBlocos(PixelYCbCr* imagem, int largura, int altura, int* num_blocos);
+typedef struct {
+    int zeros;      // número de zeros antes
+    int categoria;  // categoria JPEG (de 1 a 10)
+    int mantissa;   // valor codificado
+} RLEToken;
 
+#define BLOCK_SIZE 8
+#define K_FACTOR 1.0
+
+
+void DPCM(BlocoYCbCr* blocos, int num_blocos);
+void comprimeBloco(BlocoYCbCr bloco, TabelaHuffman* tabela_Y, TabelaHuffman* tabela_Cb, TabelaHuffman* tabela_Cr, FILE* output);
+long comprimirJPEGSemPerdas(PixelYCbCr* imagem_ycbcr, int largura, int altura, const char* output_jpeg);
+Pixel* convertYCbCrToRgb(PixelYCbCr *input, BitmapInfoHeader infoHeader);
+void aplicarZigZagBloco(int *entrada, int largura, int x_bloco, int y_bloco, int vetor_saida[64]);
 #endif

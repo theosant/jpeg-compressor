@@ -3,7 +3,12 @@
         "bmp.h": "c",
         "stdlib.h": "c",
         "stdio.h": "c",
+<<<<<<< HEAD
         "jpeg.h": "c",
         "descompressao_sem_perdas.h": "c"
+=======
+        "math.h": "c",
+        "jpeg.h": "c"
+>>>>>>> 30c9cdfb078fd73cda73b351b51464797dca738b
     }
 }

@@ -1,4 +1,7 @@
-#include "../include/jpeg.h"
+#include <stdio.h>
+#include <stdlib.h>
+#include "jpeg.h"
+#include <math.h>
 
 PixelYCbCr* convertRgbToYCbCr(Pixel *input, BitmapInfoHeader infoHeader) {
     int totalPixels = infoHeader.width * infoHeader.height;
@@ -18,34 +21,43 @@ PixelYCbCr* convertRgbToYCbCr(Pixel *input, BitmapInfoHeader infoHeader) {
     return converted;
 }
 
-Pixel* convertYCbCrToRgb(PixelYCbCr* imagem_ycbcr, int largura, int altura) {
-    int total_pixels = largura * altura;
-    Pixel* imagem_rgb = malloc(total_pixels * sizeof(Pixel));
-    
-    if (!imagem_rgb) {
-        perror("Erro ao alocar memória para imagem RGB");
-        return NULL;
+Pixel* convertYCbCrToRgb(PixelYCbCr *input, BitmapInfoHeader infoHeader) {
+    int totalPixels = infoHeader.width * infoHeader.height;
+    Pixel *rgbImage = malloc(totalPixels * sizeof(Pixel));
+    if (!rgbImage) return NULL;
+
+    for (int i = 0; i < totalPixels; i++) {
+        double Y = input[i].Y;
+        double Cb = input[i].Cb - 128;
+        double Cr = input[i].Cr - 128;
+
+        double r  = Y + 1.402 * Cr;
+        double g = Y - 0.344136 * Cb  - 0.714136 * Cr;
+        double b =  Y + 1.772 * Cb;
+
+        if (r < 0) r = 0; 
+        if (r > 255) r = 255;
+        if (g < 0) g = 0; 
+        if (g > 255) g = 255;
+        if (b < 0) b = 0; 
+        if (b > 255) b = 255;
+
+        rgbImage[i].R = (unsigned char)(r + 0.5);
+        rgbImage[i].G = (unsigned char)(g + 0.5);
+        rgbImage[i].B = (unsigned char)(b + 0.5); 
     }
 
-    for (int i = 0; i < total_pixels; i++) {
-        float Y  = imagem_ycbcr[i].Y;
-        float Cb = imagem_ycbcr[i].Cb;
-        float Cr = imagem_ycbcr[i].Cr;
-        
-        float Cb_centered = Cb - 128.0f;
-        float Cr_centered = Cr - 128.0f;
+    return rgbImage;
+}
 
-        // Fórmulas de conversão padrão (ITU-R BT.601)
-        float R = Y + 1.402f * Cr_centered;
-        float G = Y - 0.344136f * Cb_centered - 0.714136f * Cr_centered;
-        float B = Y + 1.772f * Cb_centered;
 
-        imagem_rgb[i].R = (unsigned char)(fmax(0, fmin(255, R)));
-        imagem_rgb[i].G = (unsigned char)(fmax(0, fmin(255, G)));
-        imagem_rgb[i].B = (unsigned char)(fmax(0, fmin(255, B)));
+void aplicarDPCMnosDCs(int **zigzag, int total_blocos) {
+    int anterior = zigzag[0][0];
+    for (int i = 1; i < total_blocos; i++) {
+        int atual = zigzag[i][0];
+        zigzag[i][0] = atual - anterior;
+        anterior = atual;
     }
-
-    return imagem_rgb;
 }
 
 BlocoYCbCr* dividirBlocos(PixelYCbCr* imagem, int largura, int altura, int* num_blocos) {
@@ -94,3 +106,133 @@ BlocoYCbCr* dividirBlocos(PixelYCbCr* imagem, int largura, int altura, int* num_
     
     return blocos;
 }
+
+void DPCM(BlocoYCbCr* blocos, int num_blocos) {
+    float dc_prev_Y = 0, dc_prev_Cb = 0, dc_prev_Cr = 0;
+
+    for (int i = 0; i < num_blocos; i++) {
+        float dc_Y = blocos[i].Y[0][0];
+        float dc_Cb = blocos[i].Cb[0][0];
+        float dc_Cr = blocos[i].Cr[0][0];
+
+        blocos[i].Y[0][0] = dc_Y - dc_prev_Y;
+        blocos[i].Cb[0][0] = dc_Cb - dc_prev_Cb;
+        blocos[i].Cr[0][0] = dc_Cr - dc_prev_Cr;
+
+        dc_prev_Y = dc_Y;
+        dc_prev_Cb = dc_Cb;
+        dc_prev_Cr = dc_Cr;
+    }
+}
+
+// Função auxiliar para compirmir_bloco
+const char* buscarCodigo(TabelaHuffman* tabela, int valor) {
+    valor = valor < 0 ? 0 : (valor > 255 ? 255 : valor);
+    return tabela->codigos[valor];
+}
+
+// Função auxiliar para escrever um código Huffman no buffer
+void escreveCodigo(const char* codigo, unsigned char buffer, int pos, FILE* output) {
+    for (int i = 0; codigo[i] != '\0'; i++) {
+        if (codigo[i] == '1') {
+            buffer |= (1 << (7 - pos));
+        }
+        pos++;
+        
+        if (pos == 8) {
+            fwrite(&buffer, 1, 1, output);
+            buffer = 0;
+            pos = 0;
+        }
+    }
+}
+
+// Função auxiliar para processar uma componente 8x8
+void processarComponente(float componente[8][8], TabelaHuffman* tabela, unsigned char buffer, int pos, FILE* output) {
+    for (int y = 0; y < 8; y++) {
+        for (int x = 0; x < 8; x++) {
+            // Garante que o valor está no intervalo [0, 255]
+            int valor = (int)round(componente[y][x]);
+            valor = valor < 0 ? 0 : (valor > 255 ? 255 : valor);
+            // printf("[DEBUG] Processando valor %d na pos (%d,%d)\n", valor, y, x);
+            
+            const char* codigo = buscarCodigo(tabela, valor);
+            if (!codigo) {
+                printf("[ERRO CRITICO] Codigo Huffman nao encontrado para valor %d\n", valor);
+                exit(EXIT_FAILURE);
+            }
+            // printf("[DEBUG] Codigo encontrado: %s\n", codigo);
+
+            escreveCodigo(codigo, buffer, pos, output);
+        }
+    }
+}
+
+void comprimeBloco(BlocoYCbCr bloco, TabelaHuffman* tabela_Y, 
+                    TabelaHuffman* tabela_Cb, TabelaHuffman* tabela_Cr, 
+                    FILE* output) {
+    unsigned char buffer = 0;
+    int pos = 0;
+
+    // 1. Comprime componente Y (luminância)
+    processarComponente(bloco.Y, tabela_Y, buffer, pos, output);
+
+    // 2. Comprime componente Cb (crominância azul)
+    processarComponente(bloco.Cb, tabela_Cb, buffer, pos, output);
+
+    // 3. Comprime componente Cr (crominância vermelha)
+    processarComponente(bloco.Cr, tabela_Cr, buffer, pos, output);
+
+    // 4. Escreve quaisquer bits restantes no buffer
+    if (pos > 0) {
+        fwrite(&buffer, 1, 1, output);
+    }
+}
+
+// Função principal para comprimir JPEG sem perdas
+long comprimirJPEGSemPerdas(PixelYCbCr* imagem_ycbcr, int largura, int altura, const char* output_jpeg) {    
+    // Dividir em blocos 8x8
+    int num_blocos;
+    BlocoYCbCr* blocos = dividirBlocos(imagem_ycbcr, largura, altura, &num_blocos);
+    
+    // Aplicar DPCM
+    DPCM(blocos, num_blocos);
+    
+    // Construir tabelas Huffman
+    TabelaHuffman* tabela_Y = construirTabelaHuffman(blocos, num_blocos, COMP_Y);
+    TabelaHuffman* tabela_Cb = construirTabelaHuffman(blocos, num_blocos, COMP_CB);
+    TabelaHuffman* tabela_Cr = construirTabelaHuffman(blocos, num_blocos, COMP_CR);
+    
+    // Escrever arquivo JPEG
+    FILE* out = fopen(output_jpeg, "wb");
+    if (!out) {
+        perror("Erro ao criar arquivo de saída");
+        return -1;
+    }
+    
+    // Criar cabeçalho
+    JLSHeader header;
+    memcpy(header.name, "JLS1", 4);
+    header.width = largura;
+    header.height = altura;
+    header.dataSize = num_blocos;
+
+    // Escrever cabeçalho
+    fwrite(&header, sizeof(JLSHeader), 1, out);
+    
+    // Comprimir cada bloco
+    printf("[DEBUG] Iniciando compressao dos blocos...\n");
+    for (int i = 0; i < num_blocos; i++) {
+        comprimeBloco(blocos[i], tabela_Y, tabela_Cb, tabela_Cr, out);
+    }
+    long compressed_size = ftell(out);
+    fclose(out);
+    
+    // Liberar memória
+    free(blocos);
+    destruirTabelaHuffman(tabela_Y);
+    destruirTabelaHuffman(tabela_Cb);
+    destruirTabelaHuffman(tabela_Cr);
+    return compressed_size;
+}
+

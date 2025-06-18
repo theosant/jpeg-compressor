@@ -1,59 +1,91 @@
-# Configurações básicas
-CC = gcc
-CFLAGS = -Wall -Wextra -std=c99 -I$(INC_DIR)
-LDFLAGS = -mconsole -lm
-DEBUG_FLAGS = -g
-RELEASE_FLAGS = -O2
+# Detectar sistema operacional
+ifeq ($(OS),Windows_NT)
+    RM = if exist $(1) rmdir /s /q $(1)
+    MKDIR = if not exist $(1) mkdir $(1)
+    SEP = \\
+else
+    RM = rm -rf $(1)
+    MKDIR = mkdir -p $(1)
+    SEP = /
+endif
 
 # Diretórios
 SRC_DIR = src
 INC_DIR = include
 BIN_DIR = bin
-OBJ_DIR = $(BIN_DIR)\obj
+OBJ_DIR = $(BIN_DIR)$(SEP)obj
 
-# Arquivos fonte e objetos
-SRCS = $(wildcard $(SRC_DIR)/*.c) ./main.c
-OBJS = $(patsubst $(SRC_DIR)/%.c,$(OBJ_DIR)/%.o,$(SRCS))
+# Compilador e flags
+CC = gcc
+CFLAGS = -Wall -Wextra -std=c99 -I$(INC_DIR)
+LDFLAGS = -lm
+
+DEBUG_FLAGS = -g
+RELEASE_FLAGS = -O2
+
+# Arquivos comuns
+COMMON_SRCS = $(wildcard $(SRC_DIR)/*.c)
+COMMON_OBJS = $(patsubst $(SRC_DIR)/%.c, $(OBJ_DIR)/%.o, $(COMMON_SRCS))
 DEPS = $(wildcard $(INC_DIR)/*.h)
 
-# Nome do executável
-TARGET = $(BIN_DIR)\main.exe
+# Alvos
+COMPRESSOR = $(BIN_DIR)$(SEP)compressor
+DECOMPRESSOR = $(BIN_DIR)$(SEP)descompressor
 
-# Regra principal (release por padrão)
+COMPRESSOR_OBJ = $(OBJ_DIR)/compressor.o
+DECOMPRESSOR_OBJ = $(OBJ_DIR)/descompressor.o
+
+# Regra padrão
 all: release
 
-# Build de release
 release: CFLAGS += $(RELEASE_FLAGS)
-release: $(TARGET)
+release: $(COMPRESSOR) $(DECOMPRESSOR)
 
-# Build para debug
 debug: CFLAGS += $(DEBUG_FLAGS)
-debug: $(TARGET)
+debug: $(COMPRESSOR) $(DECOMPRESSOR)
 
-# Link do executável
-$(TARGET): $(OBJS)
-	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^
+# Compilação dos executáveis
+$(COMPRESSOR): $(COMPRESSOR_OBJ) $(COMMON_OBJS) | $(BIN_DIR)
+	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS) 
 
-# Compilação dos objetos
+$(DECOMPRESSOR): $(DECOMPRESSOR_OBJ) $(COMMON_OBJS) | $(BIN_DIR)
+	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
+
+# Regras para os .o principais (fora de src/)
+$(OBJ_DIR)/compressor.o: compressor.c $(DEPS) | $(OBJ_DIR)
+	$(CC) $(CFLAGS) -c -o $@ compressor.c
+
+$(OBJ_DIR)/descompressor.o: descompressor.c $(DEPS) | $(OBJ_DIR)
+	$(CC) $(CFLAGS) -c -o $@ descompressor.c
+
+# Compilação dos objetos comuns (dentro de src/)
 $(OBJ_DIR)/%.o: $(SRC_DIR)/%.c $(DEPS) | $(OBJ_DIR)
 	$(CC) $(CFLAGS) -c -o $@ $<
 
-# Criação dos diretórios necessários (compatível com Windows)
-$(BIN_DIR) $(OBJ_DIR):
-	if not exist "$@" mkdir "$@"
+# Criação de diretórios
+$(BIN_DIR):
+	$(call MKDIR,$@)
 
-# Execução
-run: release
-	$(TARGET)
+$(OBJ_DIR):
+	$(call MKDIR,$@)
 
-# Limpeza (compatível com Windows)
+# Execuções manuais
+run-compressor: release
+	$(COMPRESSOR)
+
+run-descompressor: release
+	$(DECOMPRESSOR)
+
+# Limpeza
 clean:
-	if exist "$(BIN_DIR)" rmdir /s /q "$(BIN_DIR)"
+	$(call RM,$(BIN_DIR))
 
-# Informações do projeto
+# Info
 info:
-	@echo Sources: $(SRCS)
-	@echo Objects: $(OBJS)
-	@echo Dependencies: $(DEPS)
+	@echo OS: $(OS)
+	@echo Compressor: $(COMPRESSOR)
+	@echo Descompressor: $(DECOMPRESSOR)
+	@echo Fontes comuns: $(COMMON_SRCS)
+	@echo Objetos comuns: $(COMMON_OBJS)
 
-.PHONY: all release debug run clean info
+.PHONY: all release debug clean run-compressor run-descompressor info
