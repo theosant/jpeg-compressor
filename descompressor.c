@@ -34,22 +34,22 @@ int main(int argc, char *argv[]) {
         int *quantized_Y, *quantized_Cb, *quantized_Cr;
 
         // Leitura dos dados comprimidos (RLE + Huffman)
-        decompressEntropy(inputFile, &quantized_Y, &quantized_Cb, &quantized_Cr, &InfoHeader);
+        //decompressEntropy(inputFile, &quantized_Y, &quantized_Cb, &quantized_Cr, &InfoHeader);
 
         // Reverter quantização, IDCT, upsampling
-        converted = reconstructImageFromDCT(quantized_Y, quantized_Cb, quantized_Cr, InfoHeader);
+        //converted = reconstructImageFromDCT(quantized_Y, quantized_Cb, quantized_Cr, InfoHeader);
 
-        free(quantized_Y);
-        free(quantized_Cb);
-        free(quantized_Cr);
+        //free(quantized_Y);
+        //free(quantized_Cb);
+        //free(quantized_Cr);
 
         // Preencher um cabeçalho BMP padrão (exemplo simples)
-        FileHeader = createDefaultBmpHeader(InfoHeader);
+        //FileHeader = createDefaultBmpHeader(InfoHeader);
         
     } else if (strcmp(modo, "-lossless") == 0) {
         printf("Modo Descompressão sem perdas ativado.\n");
 
-        converted = descomprimirJPEGSemPerdas(inputFile, &FileHeader, &InfoHeader);
+        //converted = descomprimirJPEGSemPerdas(inputFile, &FileHeader, &InfoHeader);
     } else {
         fprintf(stderr, "Erro: Modo '%s' inválido.\n", modo);
         fclose(inputFile);
@@ -70,7 +70,7 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
-    saveBmpImage(output, FileHeader, InfoHeader, imageRGB);
+    //saveBmpImage(output, FileHeader, InfoHeader, imageRGB);
     fclose(output);
 
     printf("Imagem reconstruída salva em '%s'.\n", outputFile_nome);

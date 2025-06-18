@@ -3,17 +3,6 @@
 #include "jpeg.h"
 #include <math.h>
 
-static const int zigzag_order[64] = {
-     0,  1,  5,  6, 14, 15, 27, 28,
-     2,  4,  7, 13, 16, 26, 29, 42,
-     3,  8, 12, 17, 25, 30, 41, 43,
-     9, 11, 18, 24, 31, 40, 44, 53,
-    10, 19, 23, 32, 39, 45, 52, 54,
-    20, 22, 33, 38, 46, 51, 55, 60,
-    21, 34, 37, 47, 50, 56, 59, 61,
-    35, 36, 48, 49, 57, 58, 62, 63
-};
-
 PixelYCbCr* convertRgbToYCbCr(Pixel *input, BitmapInfoHeader infoHeader) {
     int totalPixels = infoHeader.width * infoHeader.height;
     PixelYCbCr *converted = malloc(totalPixels * sizeof(PixelYCbCr));
@@ -62,35 +51,6 @@ Pixel* convertYCbCrToRgb(PixelYCbCr *input, BitmapInfoHeader infoHeader) {
 }
 
 
-void aplicarZigZagBloco(int *entrada, int largura, int x_bloco, int y_bloco, int vetor_saida[64]) {
-    for (int i = 0; i < 64; i++) {
-        int dx = zigzag_order[i] / 8;
-        int dy = zigzag_order[i] % 8;
-        int x = x_bloco + dx;
-        int y = y_bloco + dy;
-        vetor_saida[i] = entrada[x * largura + y];
-    }
-}
-
-void aplicarUnZigZag(int vetor[64], int bloco[8][8]) {
-    static const int zigzag_order[64] = {
-         0,  1,  5,  6, 14, 15, 27, 28,
-         2,  4,  7, 13, 16, 26, 29, 42,
-         3,  8, 12, 17, 25, 30, 41, 43,
-         9, 11, 18, 24, 31, 40, 44, 53,
-        10, 19, 23, 32, 39, 45, 52, 54,
-        20, 22, 33, 38, 46, 51, 55, 60,
-        21, 34, 37, 47, 50, 56, 59, 61,
-        35, 36, 48, 49, 57, 58, 62, 63
-    };
-
-    for (int i = 0; i < 64; i++) {
-        int x = zigzag_order[i] / 8;
-        int y = zigzag_order[i] % 8;
-        bloco[x][y] = vetor[i];
-    }
-}
-
 void aplicarDPCMnosDCs(int **zigzag, int total_blocos) {
     int anterior = zigzag[0][0];
     for (int i = 1; i < total_blocos; i++) {
@@ -98,43 +58,6 @@ void aplicarDPCMnosDCs(int **zigzag, int total_blocos) {
         zigzag[i][0] = atual - anterior;
         anterior = atual;
     }
-}
-
-int calcularCategoria(int valor) {
-    valor = abs(valor);
-    if (valor == 0) return 0;
-    int categoria = 0;
-    while (valor) {
-        valor >>= 1;
-        categoria++;
-    }
-    return categoria;
-}
-
-// Codifica apenas AC (posição 1 a 63), retorna número de tokens
-int aplicarRLE_AC(int vetor[64], RLEToken *tokens) {
-    int idx = 0;
-    int zeroCount = 0;
-    for (int i = 1; i < 64; i++) {
-        if (vetor[i] == 0) {
-            zeroCount++;
-        } else {
-            while (zeroCount > 15) { // JPEG usa código especial ZRL para 16 zeros
-                tokens[idx++] = (RLEToken){15, 0, 0}; // ZRL
-                zeroCount -= 16;
-            }
-
-            int cat = calcularCategoria(vetor[i]);
-            tokens[idx++] = (RLEToken){zeroCount, cat, vetor[i]};
-            zeroCount = 0;
-        }
-    }
-
-    // EOB (end of block)
-    if (zeroCount > 0) {
-        tokens[idx++] = (RLEToken){0, 0, 0}; // EOB
-    }
-    return idx;
 }
 
 BlocoYCbCr* dividirBlocos(PixelYCbCr* imagem, int largura, int altura, int* num_blocos) {
@@ -275,7 +198,7 @@ long comprimirJPEGSemPerdas(PixelYCbCr* imagem_ycbcr, int largura, int altura, c
     FILE* out = fopen(output_jpeg, "wb");
     if (!out) {
         perror("Erro ao criar arquivo de saída");
-        return;
+        return -1;
     }
     
     // Criar cabeçalho

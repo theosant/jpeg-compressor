@@ -46,10 +46,10 @@ debug: $(COMPRESSOR) $(DECOMPRESSOR)
 
 # Compilação dos executáveis
 $(COMPRESSOR): $(COMPRESSOR_OBJ) $(COMMON_OBJS) | $(BIN_DIR)
-	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^
+	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS) 
 
 $(DECOMPRESSOR): $(DECOMPRESSOR_OBJ) $(COMMON_OBJS) | $(BIN_DIR)
-	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^
+	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
 
 # Regras para os .o principais (fora de src/)
 $(OBJ_DIR)/compressor.o: compressor.c $(DEPS) | $(OBJ_DIR)

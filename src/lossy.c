@@ -1,5 +1,27 @@
 #include "lossy.h"
+#include "jpeg.h"
 
+const int LUMINANCE_Q_TABLE[8][8] = {
+    {16, 11, 10, 16, 24, 40, 51, 61},
+    {12, 12, 14, 19, 26, 58, 60, 55},
+    {14, 13, 16, 24, 40, 57, 69, 56},
+    {14, 17, 22, 29, 51, 87, 80, 62},
+    {18, 22, 37, 56, 68, 109, 103, 77},
+    {24, 35, 55, 64, 81, 104, 113, 92},
+    {49, 64, 78, 87, 103, 121, 120, 101},
+    {72, 92, 95, 98, 112, 100, 103, 99}
+};
+
+const int CHROMINANCE_Q_TABLE[8][8] = {
+    {17, 18, 24, 47, 99, 99, 99, 99},
+    {18, 21, 26, 66, 99, 99, 99, 99},
+    {24, 26, 56, 99, 99, 99, 99, 99},
+    {47, 66, 99, 99, 99, 99, 99, 99},
+    {99, 99, 99, 99, 99, 99, 99, 99},
+    {99, 99, 99, 99, 99, 99, 99, 99},
+    {99, 99, 99, 99, 99, 99, 99, 99},
+    {99, 99, 99, 99, 99, 99, 99, 99}
+};
 void downSampling(PixelYCbCr *input, BitmapInfoHeader infoHeader, double **CbDown, double **CrDown){
     int width = infoHeader.width;
     int height =  infoHeader.height;
@@ -351,7 +373,146 @@ void reconstructImageFromDCT(
     free(CrFull);
 }
 
-long entropy_encode(int* quantized_Y, int* quantized_Cb, int* quantized_Cr, int largura, int altura) {
 
+
+// Codificação binária (sem buffer bit a bit real aqui)
+void escreverBits(FILE* out, int valor, int bits) {
+    unsigned int code = valor >= 0 ? valor : ((1 << bits) - 1 + valor);
+    for (int i = bits - 1; i >= 0; i--) {
+        unsigned char bit = (code >> i) & 1;
+        fwrite(&bit, 1, 1, out); // ou usar bitstream real
+    }
+}
+
+void aplicarZigZag(int bloco[8][8], int vetor_saida[64]) {
+    for (int i = 0; i < 64; i++) {
+        int x = zigzag_order[i] / 8;
+        int y = zigzag_order[i] % 8;
+        vetor_saida[i] = bloco[x][y];
+    }
+}
+
+// Codificação do coeficiente DC
+void codificarDC(int diff, FILE* out) {
+    int cat = calcularCategoria(diff);
+    fwrite(&cat, 1, 1, out); // prefixo fictício
+
+    if (cat > 0)
+        escreverBits(out, diff, cat);
+}
+
+// Codificação RLE + Huffman simplificado para os 63 ACs
+void codificarAC(int* ac, FILE* out) {
+    int zeros = 0;
+    for (int i = 0; i < 63; i++) {
+        int val = ac[i];
+        if (val == 0) {
+            zeros++;
+        } else {
+            while (zeros > 15) {
+                unsigned char zrl = 0xF0;
+                fwrite(&zrl, 1, 1, out);
+                zeros -= 16;
+            }
+
+            int cat = calcularCategoria(val);
+            unsigned char prefixo = (zeros << 4) | cat;
+            fwrite(&prefixo, 1, 1, out);
+            escreverBits(out, val, cat);
+            zeros = 0;
+        }
+    }
+
+    // End of Block (EOB)
+    unsigned char eob = 0x00;
+    fwrite(&eob, 1, 1, out);
+}
+
+
+int calcularCategoria(int valor) {
+    valor = abs(valor);
+    if (valor == 0) return 0;
+    int categoria = 0;
+    while (valor) {
+        valor >>= 1;
+        categoria++;
+    }
+    return categoria;
+}
+
+
+long entropy_encode(int* quantized_Y, int* quantized_Cb, int* quantized_Cr, int largura, int altura) {
+    FILE* out = fopen("saida_entropy.jpegl", "wb");
+    if (!out) {
+        perror("Erro ao abrir arquivo de saída");
+        return 0;
+    }
+
+    // Escrever cabeçalho simplificado
+    fwrite("JPG1", 4, 1, out);
+    fwrite(&largura, sizeof(int), 1, out);
+    fwrite(&altura, sizeof(int), 1, out);
+
+    int blocos_Y = (largura * altura) / 64;
+    int blocos_C = (largura / 2 * altura / 2) / 64;
+
+    int bloco_matriz[8][8];
+    int vetor_zigzag[64];
+
+    int dc_ant_Y = 0, dc_ant_Cb = 0, dc_ant_Cr = 0;
+
+     for (int i = 0; i < blocos_Y; i++) {
+        int* bloco = &quantized_Y[i * 64];
+
+        // Copia para matriz
+        for (int y = 0; y < 8; y++)
+            for (int x = 0; x < 8; x++)
+                bloco_matriz[y][x] = bloco[y * 8 + x];
+
+        aplicarZigZag(bloco_matriz, vetor_zigzag);
+
+        int diff = vetor_zigzag[0] - dc_ant_Y;
+        dc_ant_Y = vetor_zigzag[0];
+
+        codificarDC(diff, out);
+        codificarAC(&vetor_zigzag[1], out);
+    }
+    // --- Codificar Cb ---
+    for (int i = 0; i < blocos_C; i++) {
+        int* bloco = &quantized_Cb[i * 64];
+
+        for (int y = 0; y < 8; y++)
+            for (int x = 0; x < 8; x++)
+                bloco_matriz[y][x] = bloco[y * 8 + x];
+
+        aplicarZigZag(bloco_matriz, vetor_zigzag);
+
+        int diff = vetor_zigzag[0] - dc_ant_Cb;
+        dc_ant_Cb = vetor_zigzag[0];
+
+        codificarDC(diff, out);
+        codificarAC(&vetor_zigzag[1], out);
+    }
+
+    // --- Codificar Cr ---
+    for (int i = 0; i < blocos_C; i++) {
+        int* bloco = &quantized_Cr[i * 64];
+
+        for (int y = 0; y < 8; y++)
+            for (int x = 0; x < 8; x++)
+                bloco_matriz[y][x] = bloco[y * 8 + x];
+
+        aplicarZigZag(bloco_matriz, vetor_zigzag);
+
+        int diff = vetor_zigzag[0] - dc_ant_Cr;
+        dc_ant_Cr = vetor_zigzag[0];
+
+        codificarDC(diff, out);
+        codificarAC(&vetor_zigzag[1], out);
+    }
+
+    long tamanho = ftell(out);
+    fclose(out);
+    return tamanho;
 
 }

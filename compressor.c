@@ -49,7 +49,7 @@ int main(int argc, char *argv[]){
 
     } else if (strcmp(modo, "-lossless") == 0) {
         printf("Modo Compressão sem Perdas ativado.\n");
-        tamanho_comprimido = comprimirJPEGSemPerdas(converted, inputFile_nome, outputFile_nome);
+        tamanho_comprimido = comprimirJPEGSemPerdas(converted, InfoHeader.width, InfoHeader.height, outputFile_nome);
     } else {
         fprintf(stderr, "Erro: Modo '%s' inválido.\n", modo);
         
@@ -70,16 +70,7 @@ int main(int argc, char *argv[]){
     } else {
         fprintf(stderr, "A compressao falhou ou resultou em um arquivo de tamanho 0.\n");
     }
-    // Realiza Dequantização, IDCT e Upsampling
-    // reconstructImageFromDCT(quantized_Y_out,quantized_Cb_out,quantized_Cr_out,InfoHeader,converted); 
 
-    // Converte de volta para RGB
-    // Pixel *Image2 = convertYCbCrToRgb(converted, InfoHeader);
-
-    // Salva imagem resultante
-    // saveBmpImage("output.bmp", FileHeader, InfoHeader, Image2);
-
-    // Libera a memória
     free(Image);
     free(converted);
 
