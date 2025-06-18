@@ -42,7 +42,7 @@ int main(int argc, char *argv[]){
         int *quantized_Y_out, *quantized_Cb_out, *quantized_Cr_out;
         // Realiza DownSampling, DCT e Quantização
         processImageDCT(converted, InfoHeader, &quantized_Y_out, &quantized_Cb_out, &quantized_Cr_out);
-        tamanho_comprimido = entropy_encode(quantized_Y_out, quantized_Cb_out, quantized_Cr_out,  InfoHeader.width, InfoHeader.height);
+        tamanho_comprimido = entropy_encode(quantized_Y_out, quantized_Cb_out, quantized_Cr_out,  InfoHeader.width, InfoHeader.height, outputFile_nome);
         free(quantized_Y_out);
         free(quantized_Cb_out);
         free(quantized_Cr_out);

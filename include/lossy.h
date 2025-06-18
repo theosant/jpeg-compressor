@@ -38,7 +38,7 @@ void codificarDC(int diff, FILE* out);
 void codificarAC(int* ac, FILE* out);
 void aplicarZigZag(int bloco[8][8], int vetor_saida[64]);
 void aplicarUnZigZag(int vetor[64], int bloco[8][8]);
-long entropy_encode(int* quantized_Y, int* quantized_Cb, int* quantized_Cr, int largura, int altura);
+long entropy_encode(int* quantized_Y, int* quantized_Cb, int* quantized_Cr, int largura, int altura, const char* nome_saida);
 int calcularCategoria(int valor);
 int lerBits(FILE* in, int bits);
 int decodificarMagnitude(int code, int categoria);

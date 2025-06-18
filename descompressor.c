@@ -37,7 +37,7 @@ int main(int argc, char *argv[]) {
 
         // Leitura dos dados comprimidos (RLE + Huffman)
         decompressEntropy(inputFile, &quantized_Y, &quantized_Cb, &quantized_Cr, &InfoHeader);
-
+       
         // Reverter quantização, IDCT, upsampling
         converted = reconstructImageFromDCT(quantized_Y, quantized_Cb, quantized_Cr, InfoHeader);
         free(quantized_Y);
@@ -52,9 +52,13 @@ int main(int argc, char *argv[]) {
         fclose(inputFile);
         return 1;
     }
-
     fclose(inputFile);
 
+    FileHeader.type = 0x4D42;          
+    FileHeader.offsetBits = 54;           
+    FileHeader.reserved1 = 0;
+    FileHeader.reserved2 = 0;
+    FileHeader.size = FileHeader.offsetBits + InfoHeader.imageSize;
     // Converter YCbCr de volta para RGB
     Pixel* imageRGB = convertYCbCrToRgb(converted, InfoHeader);
     

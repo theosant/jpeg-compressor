@@ -357,15 +357,17 @@ PixelYCbCr *reconstructImageFromDCT(
     for (int i = 0; i < totalPixels; i++) {
         converted[i].Y = reconstructedY[i];
     }
-
     // Upsampling e atualização de Cb e Cr
     double *CbFull, *CrFull;
     upSampling(reconstructedCbDown , reconstructedCrDown , InfoHeader, &CbFull, &CrFull);
 
+    
     for (int i = 0; i < totalPixels; i++) {
         converted[i].Cb = CbFull[i];
         converted[i].Cr = CrFull[i];
     }
+    free(CbFull);
+    free(CrFull);
 
     // Liberação de memória
     free(dequantized_dct_Y);
@@ -374,20 +376,36 @@ PixelYCbCr *reconstructImageFromDCT(
     free(reconstructedCbDown);
     free(reconstructedCrDown);
     free(reconstructedY);
-    free(CbFull);
-    free(CrFull);
+  
 
     return converted;
 }
 
 
 
-// Codificação binária (sem buffer bit a bit real aqui)
+static unsigned char write_buffer = 0;
+static int write_bits_left = 8;
+
+void flushBits(FILE* out) {
+    if (write_bits_left < 8) {
+        fwrite(&write_buffer, 1, 1, out);
+        write_buffer = 0;
+        write_bits_left = 8;
+    }
+}
+
 void escreverBits(FILE* out, int valor, int bits) {
     unsigned int code = valor >= 0 ? valor : ((1 << bits) - 1 + valor);
+
     for (int i = bits - 1; i >= 0; i--) {
-        unsigned char bit = (code >> i) & 1;
-        fwrite(&bit, 1, 1, out); // ou usar bitstream real
+        write_buffer |= ((code >> i) & 1) << (write_bits_left - 1);
+        write_bits_left--;
+
+        if (write_bits_left == 0) {
+            fwrite(&write_buffer, 1, 1, out);
+            write_buffer = 0;
+            write_bits_left = 8;
+        }
     }
 }
 
@@ -535,6 +553,14 @@ void decompressEntropy(FILE* in, int** quantized_Y, int** quantized_Cb, int** qu
     header->width = width;
     header->height = height;
     header->imageSize  = width * height * 3;
+    header->size = sizeof(BitmapInfoHeader);
+    header->planes = 1;
+    header->bitCount = 24;
+    header->compression = 0;
+    header->xResolution = 2835;
+    header->yResolution = 2835;
+    header->colorsUsed = 0;
+    header->importantColors = 0;
 
     int blocos_Y = (width * height) / 64;
     int blocos_C = (width/2 * height/2) / 64;
@@ -550,7 +576,9 @@ void decompressEntropy(FILE* in, int** quantized_Y, int** quantized_Cb, int** qu
     // --- Y ---
     dc_ant = 0;
     for (int i = 0; i < blocos_Y; i++) {
-        decodificarDC(in, &dc_ant, &vetor_zigzag[0]);
+        int dc_valor;
+        decodificarDC(in, &dc_ant, &dc_valor);
+        vetor_zigzag[0] = dc_valor;
         decodificarAC(in, vetor_zigzag);
 
         aplicarUnZigZag(vetor_zigzag, bloco);
@@ -562,7 +590,9 @@ void decompressEntropy(FILE* in, int** quantized_Y, int** quantized_Cb, int** qu
     // --- Cb ---
     dc_ant = 0;
     for (int i = 0; i < blocos_C; i++) {
-        decodificarDC(in, &dc_ant, &vetor_zigzag[0]);
+        int dc_valor;
+        decodificarDC(in, &dc_ant, &dc_valor);
+        vetor_zigzag[0] = dc_valor;
         decodificarAC(in, vetor_zigzag);
 
         aplicarUnZigZag(vetor_zigzag, bloco);
@@ -574,7 +604,9 @@ void decompressEntropy(FILE* in, int** quantized_Y, int** quantized_Cb, int** qu
     // --- Cr ---
     dc_ant = 0;
     for (int i = 0; i < blocos_C; i++) {
-        decodificarDC(in, &dc_ant, &vetor_zigzag[0]);
+        int dc_valor;
+        decodificarDC(in, &dc_ant, &dc_valor);
+        vetor_zigzag[0] = dc_valor;
         decodificarAC(in, vetor_zigzag);
 
         aplicarUnZigZag(vetor_zigzag, bloco);
@@ -597,8 +629,8 @@ int calcularCategoria(int valor) {
 }
 
 
-long entropy_encode(int* quantized_Y, int* quantized_Cb, int* quantized_Cr, int largura, int altura) {
-    FILE* out = fopen("saida_entropy.jpegl", "wb");
+long entropy_encode(int* quantized_Y, int* quantized_Cb, int* quantized_Cr, int largura, int altura, const char* nome_saida) {
+    FILE* out = fopen(nome_saida, "wb");
     if (!out) {
         perror("Erro ao abrir arquivo de saída");
         return 0;
@@ -666,7 +698,7 @@ long entropy_encode(int* quantized_Y, int* quantized_Cb, int* quantized_Cr, int 
         codificarDC(diff, out);
         codificarAC(&vetor_zigzag[1], out);
     }
-
+    flushBits(out);
     long tamanho = ftell(out);
     fclose(out);
     return tamanho;
