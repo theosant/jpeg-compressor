@@ -464,6 +464,10 @@ void codificarAC(int* ac, FILE* out) {
 static unsigned char bit_buffer = 0;
 static int bits_disponiveis = 0;
 
+void resetarLeituraDeBits() {
+    bit_buffer = 0;
+    bits_disponiveis = 0;
+}
 int lerUmBit(FILE* in) {
     if (bits_disponiveis == 0) {
         if (fread(&bit_buffer, 1, 1, in) != 1) {
@@ -537,7 +541,6 @@ void decodificarAC(FILE* in, int* vetor_zigzag) {
         vetor_zigzag[pos++] = decodificarMagnitude(mag, cat);
     }
 }
-
 void decompressEntropy(FILE* in, int** quantized_Y, int** quantized_Cb, int** quantized_Cr, BitmapInfoHeader* header) {
     char magic[5] = {0};
     fread(magic, 1, 4, in);
@@ -562,59 +565,93 @@ void decompressEntropy(FILE* in, int** quantized_Y, int** quantized_Cb, int** qu
     header->colorsUsed = 0;
     header->importantColors = 0;
 
-    int blocos_Y = (width * height) / 64;
-    int blocos_C = (width/2 * height/2) / 64;
+    int totalPixels_Y = width * height;
+    int width_chroma = width / 2;
+    int height_chroma = height / 2;
+    int totalPixels_C = width_chroma * height_chroma;
 
-    *quantized_Y = malloc(blocos_Y * 64 * sizeof(int));
-    *quantized_Cb = malloc(blocos_C * 64 * sizeof(int));
-    *quantized_Cr = malloc(blocos_C * 64 * sizeof(int));
+    *quantized_Y = malloc(totalPixels_Y * sizeof(int));
+    *quantized_Cb = malloc(totalPixels_C * sizeof(int));
+    *quantized_Cr = malloc(totalPixels_C * sizeof(int));
+
+    if (!*quantized_Y || !*quantized_Cb || !*quantized_Cr) {
+        fprintf(stderr, "Erro ao alocar memória na descompressão.\n");
+        exit(1);
+    }
 
     int vetor_zigzag[64];
     int bloco[8][8];
-    int dc_ant = 0;
+    int dc_ant;
 
-    // --- Y ---
+    // --- Decodifica o Canal Y ---
     dc_ant = 0;
-    for (int i = 0; i < blocos_Y; i++) {
-        int dc_valor;
-        decodificarDC(in, &dc_ant, &dc_valor);
-        vetor_zigzag[0] = dc_valor;
-        decodificarAC(in, vetor_zigzag);
+    for (int by = 0; by < height; by += 8) {
+        for (int bx = 0; bx < width; bx += 8) {
+            int dc_valor;
+            decodificarDC(in, &dc_ant, &dc_valor);
+            vetor_zigzag[0] = dc_valor;
+            decodificarAC(in, vetor_zigzag);
+            aplicarUnZigZag(vetor_zigzag, bloco);
 
-        aplicarUnZigZag(vetor_zigzag, bloco);
-        for (int y = 0; y < 8; y++)
-            for (int x = 0; x < 8; x++)
-                (*quantized_Y)[i * 64 + y * 8 + x] = bloco[y][x];
+            for (int y = 0; y < 8; y++) {
+                for (int x = 0; x < 8; x++) {
+                    int image_y = by + y;
+                    int image_x = bx + x;
+                    if (image_y < height && image_x < width) {
+                        (*quantized_Y)[image_y * width + image_x] = bloco[y][x];
+                    }
+                }
+            }
+        }
     }
 
-    // --- Cb ---
+    // --- Decodifica o Canal Cb ---
     dc_ant = 0;
-    for (int i = 0; i < blocos_C; i++) {
-        int dc_valor;
-        decodificarDC(in, &dc_ant, &dc_valor);
-        vetor_zigzag[0] = dc_valor;
-        decodificarAC(in, vetor_zigzag);
+    resetarLeituraDeBits();
+    for (int by = 0; by < height_chroma; by += 8) {
+        for (int bx = 0; bx < width_chroma; bx += 8) {
+            int dc_valor;
+            decodificarDC(in, &dc_ant, &dc_valor);
+            vetor_zigzag[0] = dc_valor;
+            decodificarAC(in, vetor_zigzag);
+            aplicarUnZigZag(vetor_zigzag, bloco);
 
-        aplicarUnZigZag(vetor_zigzag, bloco);
-        for (int y = 0; y < 8; y++)
-            for (int x = 0; x < 8; x++)
-                (*quantized_Cb)[i * 64 + y * 8 + x] = bloco[y][x];
+            for (int y = 0; y < 8; y++) {
+                for (int x = 0; x < 8; x++) {
+                    int image_y = by + y;
+                    int image_x = bx + x;
+                    if (image_y < height_chroma && image_x < width_chroma) {
+                        (*quantized_Cb)[image_y * width_chroma + image_x] = bloco[y][x];
+                    }
+                }
+            }
+        }
     }
 
-    // --- Cr ---
+    // --- Decodifica o Canal Cr ---
     dc_ant = 0;
-    for (int i = 0; i < blocos_C; i++) {
-        int dc_valor;
-        decodificarDC(in, &dc_ant, &dc_valor);
-        vetor_zigzag[0] = dc_valor;
-        decodificarAC(in, vetor_zigzag);
+    resetarLeituraDeBits();
+    for (int by = 0; by < height_chroma; by += 8) {
+        for (int bx = 0; bx < width_chroma; bx += 8) {
+            int dc_valor;
+            decodificarDC(in, &dc_ant, &dc_valor);
+            vetor_zigzag[0] = dc_valor;
+            decodificarAC(in, vetor_zigzag);
+            aplicarUnZigZag(vetor_zigzag, bloco);
 
-        aplicarUnZigZag(vetor_zigzag, bloco);
-        for (int y = 0; y < 8; y++)
-            for (int x = 0; x < 8; x++)
-                (*quantized_Cr)[i * 64 + y * 8 + x] = bloco[y][x];
+            for (int y = 0; y < 8; y++) {
+                for (int x = 0; x < 8; x++) {
+                    int image_y = by + y;
+                    int image_x = bx + x;
+                    if (image_y < height_chroma && image_x < width_chroma) {
+                        (*quantized_Cr)[image_y * width_chroma + image_x] = bloco[y][x];
+                    }
+                }
+            }
+        }
     }
 }
+
 
 
 int calcularCategoria(int valor) {
@@ -628,7 +665,6 @@ int calcularCategoria(int valor) {
     return categoria;
 }
 
-
 long entropy_encode(int* quantized_Y, int* quantized_Cb, int* quantized_Cr, int largura, int altura, const char* nome_saida) {
     FILE* out = fopen(nome_saida, "wb");
     if (!out) {
@@ -636,71 +672,90 @@ long entropy_encode(int* quantized_Y, int* quantized_Cb, int* quantized_Cr, int 
         return 0;
     }
 
-    // Escrever cabeçalho simplificado
+    // Escreve o cabeçalho do arquivo
     fwrite("JPG1", 4, 1, out);
     fwrite(&largura, sizeof(int), 1, out);
     fwrite(&altura, sizeof(int), 1, out);
 
-    int blocos_Y = (largura * altura) / 64;
-    int blocos_C = (largura / 2 * altura / 2) / 64;
-
     int bloco_matriz[8][8];
     int vetor_zigzag[64];
+    int dc_ant;
 
-    int dc_ant_Y = 0, dc_ant_Cb = 0, dc_ant_Cr = 0;
+    // --- Codifica o Canal Y ---
+    dc_ant = 0;
+    for (int by = 0; by < altura; by += 8) {
+        for (int bx = 0; bx < largura; bx += 8) {
+            // Extrai o bloco 8x8 da imagem quantizada
+            for (int y = 0; y < 8; y++) {
+                for (int x = 0; x < 8; x++) {
+                    int image_y = by + y;
+                    int image_x = bx + x;
+                    if (image_y < altura && image_x < largura) {
+                        bloco_matriz[y][x] = quantized_Y[image_y * largura + image_x];
+                    } else {
+                        bloco_matriz[y][x] = 0;
+                    }
+                }
+            }
+            aplicarZigZag(bloco_matriz, vetor_zigzag);
 
-     for (int i = 0; i < blocos_Y; i++) {
-        int* bloco = &quantized_Y[i * 64];
-
-        // Copia para matriz
-        for (int y = 0; y < 8; y++)
-            for (int x = 0; x < 8; x++)
-                bloco_matriz[y][x] = bloco[y * 8 + x];
-
-        aplicarZigZag(bloco_matriz, vetor_zigzag);
-
-        int diff = vetor_zigzag[0] - dc_ant_Y;
-        dc_ant_Y = vetor_zigzag[0];
-
-        codificarDC(diff, out);
-        codificarAC(&vetor_zigzag[1], out);
+            // Codifica DC e AC
+            int diff = vetor_zigzag[0] - dc_ant;
+            dc_ant = vetor_zigzag[0];
+            codificarDC(diff, out);
+            codificarAC(&vetor_zigzag[1], out);
+        }
     }
-    // --- Codificar Cb ---
-    for (int i = 0; i < blocos_C; i++) {
-        int* bloco = &quantized_Cb[i * 64];
-
-        for (int y = 0; y < 8; y++)
-            for (int x = 0; x < 8; x++)
-                bloco_matriz[y][x] = bloco[y * 8 + x];
-
-        aplicarZigZag(bloco_matriz, vetor_zigzag);
-
-        int diff = vetor_zigzag[0] - dc_ant_Cb;
-        dc_ant_Cb = vetor_zigzag[0];
-
-        codificarDC(diff, out);
-        codificarAC(&vetor_zigzag[1], out);
+    flushBits(out);
+    // --- Codifica o Canal Cb ---
+    int largura_chroma = largura / 2;
+    int altura_chroma = altura / 2;
+    dc_ant = 0;
+    for (int by = 0; by < altura_chroma; by += 8) {
+        for (int bx = 0; bx < largura_chroma; bx += 8) {
+            for (int y = 0; y < 8; y++) {
+                for (int x = 0; x < 8; x++) {
+                    int image_y = by + y;
+                    int image_x = bx + x;
+                    if (image_y < altura_chroma && image_x < largura_chroma) {
+                        bloco_matriz[y][x] = quantized_Cb[image_y * largura_chroma + image_x];
+                    } else {
+                        bloco_matriz[y][x] = 0;
+                    }
+                }
+            }
+            aplicarZigZag(bloco_matriz, vetor_zigzag);
+            int diff = vetor_zigzag[0] - dc_ant;
+            dc_ant = vetor_zigzag[0];
+            codificarDC(diff, out);
+            codificarAC(&vetor_zigzag[1], out);
+        }
     }
-
-    // --- Codificar Cr ---
-    for (int i = 0; i < blocos_C; i++) {
-        int* bloco = &quantized_Cr[i * 64];
-
-        for (int y = 0; y < 8; y++)
-            for (int x = 0; x < 8; x++)
-                bloco_matriz[y][x] = bloco[y * 8 + x];
-
-        aplicarZigZag(bloco_matriz, vetor_zigzag);
-
-        int diff = vetor_zigzag[0] - dc_ant_Cr;
-        dc_ant_Cr = vetor_zigzag[0];
-
-        codificarDC(diff, out);
-        codificarAC(&vetor_zigzag[1], out);
+    flushBits(out);
+    // --- Codifica o Canal Cr ---
+    dc_ant = 0;
+    for (int by = 0; by < altura_chroma; by += 8) {
+        for (int bx = 0; bx < largura_chroma; bx += 8) {
+            for (int y = 0; y < 8; y++) {
+                for (int x = 0; x < 8; x++) {
+                    int image_y = by + y;
+                    int image_x = bx + x;
+                    if (image_y < altura_chroma && image_x < largura_chroma) {
+                        bloco_matriz[y][x] = quantized_Cr[image_y * largura_chroma + image_x];
+                    } else {
+                        bloco_matriz[y][x] = 0;
+                    }
+                }
+            }
+            aplicarZigZag(bloco_matriz, vetor_zigzag);
+            int diff = vetor_zigzag[0] - dc_ant;
+            dc_ant = vetor_zigzag[0];
+            codificarDC(diff, out);
+            codificarAC(&vetor_zigzag[1], out);
+        }
     }
     flushBits(out);
     long tamanho = ftell(out);
     fclose(out);
     return tamanho;
-
 }
