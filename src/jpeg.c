@@ -258,29 +258,10 @@ void comprimeBloco(BlocoYCbCr bloco, TabelaHuffman* tabela_Y,
 }
 
 // Função principal para comprimir JPEG sem perdas
-void comprimirJPEGSemPerdas(const char* input_bmp, const char* output_jpeg) {
-    printf("\n[DEBUG] Iniciando compressao JPEG sem perdas...\n");
-    
-    FILE* fp = fopen(input_bmp, "rb");
-    if (!fp) {
-        perror("Erro ao abrir arquivo BMP");
-        return;
-    }
-    
-    // Ler cabeçalhos e imagem
-    BitmapFileHeader fileHeader;
-    BitmapInfoHeader infoHeader;
-    loadBmpHeaders(fp, &fileHeader, &infoHeader);
-
-    Pixel* imagem_rgb = loadBmpImage(fp, infoHeader);
-    fclose(fp);
-    
-    // Converter para YCbCr
-    PixelYCbCr* imagem_ycbcr = convertRgbToYCbCr(imagem_rgb, infoHeader);
-    
+long comprimirJPEGSemPerdas(PixelYCbCr* imagem_ycbcr, int largura, int altura, const char* output_jpeg) {    
     // Dividir em blocos 8x8
     int num_blocos;
-    BlocoYCbCr* blocos = dividirBlocos(imagem_ycbcr, infoHeader.width, infoHeader.height, &num_blocos);
+    BlocoYCbCr* blocos = dividirBlocos(imagem_ycbcr, largura, altura, &num_blocos);
     
     // Aplicar DPCM
     DPCM(blocos, num_blocos);
@@ -300,8 +281,8 @@ void comprimirJPEGSemPerdas(const char* input_bmp, const char* output_jpeg) {
     // Criar cabeçalho
     JLSHeader header;
     memcpy(header.name, "JLS1", 4);
-    header.width = infoHeader.width;
-    header.height = infoHeader.height;
+    header.width = largura;
+    header.height = altura;
     header.dataSize = num_blocos;
 
     // Escrever cabeçalho
@@ -312,15 +293,14 @@ void comprimirJPEGSemPerdas(const char* input_bmp, const char* output_jpeg) {
     for (int i = 0; i < num_blocos; i++) {
         comprimeBloco(blocos[i], tabela_Y, tabela_Cb, tabela_Cr, out);
     }
-    
+    long compressed_size = ftell(out);
     fclose(out);
     
     // Liberar memória
-    free(imagem_rgb);
-    free(imagem_ycbcr);
     free(blocos);
     destruirTabelaHuffman(tabela_Y);
     destruirTabelaHuffman(tabela_Cb);
     destruirTabelaHuffman(tabela_Cr);
+    return compressed_size;
 }
 

@@ -2,12 +2,10 @@
 ifeq ($(OS),Windows_NT)
     RM = if exist $(1) rmdir /s /q $(1)
     MKDIR = if not exist $(1) mkdir $(1)
-    EXEC = $(TARGET).exe
     SEP = \\
 else
     RM = rm -rf $(1)
     MKDIR = mkdir -p $(1)
-    EXEC = ./$(TARGET)
     SEP = /
 endif
 
@@ -25,28 +23,42 @@ LDFLAGS = -lm
 DEBUG_FLAGS = -g
 RELEASE_FLAGS = -O2
 
-# Arquivos
-SRCS = $(wildcard $(SRC_DIR)/*.c) main.c
-OBJS = $(patsubst $(SRC_DIR)/%.c, $(OBJ_DIR)/%.o, $(SRCS))
+# Arquivos comuns
+COMMON_SRCS = $(wildcard $(SRC_DIR)/*.c)
+COMMON_OBJS = $(patsubst $(SRC_DIR)/%.c, $(OBJ_DIR)/%.o, $(COMMON_SRCS))
 DEPS = $(wildcard $(INC_DIR)/*.h)
 
-# Nome do executável (sem extensão aqui)
-TARGET = $(BIN_DIR)$(SEP)main
+# Alvos
+COMPRESSOR = $(BIN_DIR)$(SEP)compressor
+DECOMPRESSOR = $(BIN_DIR)$(SEP)descompressor
+
+COMPRESSOR_OBJ = $(OBJ_DIR)/compressor.o
+DECOMPRESSOR_OBJ = $(OBJ_DIR)/descompressor.o
 
 # Regra padrão
 all: release
 
 release: CFLAGS += $(RELEASE_FLAGS)
-release: $(EXEC)
+release: $(COMPRESSOR) $(DECOMPRESSOR)
 
 debug: CFLAGS += $(DEBUG_FLAGS)
-debug: $(EXEC)
+debug: $(COMPRESSOR) $(DECOMPRESSOR)
 
-# Linkagem
-$(EXEC): $(OBJS) | $(BIN_DIR)
+# Compilação dos executáveis
+$(COMPRESSOR): $(COMPRESSOR_OBJ) $(COMMON_OBJS) | $(BIN_DIR)
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^
 
-# Compilar objetos
+$(DECOMPRESSOR): $(DECOMPRESSOR_OBJ) $(COMMON_OBJS) | $(BIN_DIR)
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^
+
+# Regras para os .o principais (fora de src/)
+$(OBJ_DIR)/compressor.o: compressor.c $(DEPS) | $(OBJ_DIR)
+	$(CC) $(CFLAGS) -c -o $@ compressor.c
+
+$(OBJ_DIR)/descompressor.o: descompressor.c $(DEPS) | $(OBJ_DIR)
+	$(CC) $(CFLAGS) -c -o $@ descompressor.c
+
+# Compilação dos objetos comuns (dentro de src/)
 $(OBJ_DIR)/%.o: $(SRC_DIR)/%.c $(DEPS) | $(OBJ_DIR)
 	$(CC) $(CFLAGS) -c -o $@ $<
 
@@ -57,9 +69,12 @@ $(BIN_DIR):
 $(OBJ_DIR):
 	$(call MKDIR,$@)
 
-# Execução
-run: release
-	$(EXEC)
+# Execuções manuais
+run-compressor: release
+	$(COMPRESSOR)
+
+run-descompressor: release
+	$(DECOMPRESSOR)
 
 # Limpeza
 clean:
@@ -68,8 +83,9 @@ clean:
 # Info
 info:
 	@echo OS: $(OS)
-	@echo Executável: $(EXEC)
-	@echo Fontes: $(SRCS)
-	@echo Objetos: $(OBJS)
+	@echo Compressor: $(COMPRESSOR)
+	@echo Descompressor: $(DECOMPRESSOR)
+	@echo Fontes comuns: $(COMMON_SRCS)
+	@echo Objetos comuns: $(COMMON_OBJS)
 
-.PHONY: all release debug run clean info
+.PHONY: all release debug clean run-compressor run-descompressor info

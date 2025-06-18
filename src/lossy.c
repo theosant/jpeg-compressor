@@ -351,3 +351,7 @@ void reconstructImageFromDCT(
     free(CrFull);
 }
 
+long entropy_encode(int* quantized_Y, int* quantized_Cb, int* quantized_Cr, int largura, int altura) {
+
+
+}

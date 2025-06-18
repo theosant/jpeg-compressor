@@ -55,7 +55,7 @@ PixelYCbCr* convertRgbToYCbCr(Pixel *input, BitmapInfoHeader infoHeader);
 BlocoYCbCr* dividirBlocos(PixelYCbCr* imagem, int largura, int altura, int* num_blocos);
 void DPCM(BlocoYCbCr* blocos, int num_blocos);
 void comprimeBloco(BlocoYCbCr bloco, TabelaHuffman* tabela_Y, TabelaHuffman* tabela_Cb, TabelaHuffman* tabela_Cr, FILE* output);
-void comprimirJPEGSemPerdas(const char* input_bmp, const char* output_jpeg);
+long comprimirJPEGSemPerdas(PixelYCbCr* imagem_ycbcr, const char* input_bmp, const char* output_jpeg);
 Pixel* convertYCbCrToRgb(PixelYCbCr *input, BitmapInfoHeader infoHeader);
 void aplicarZigZagBloco(int *entrada, int largura, int x_bloco, int y_bloco, int vetor_saida[64]);
 #endif

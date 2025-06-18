@@ -20,5 +20,12 @@ void reconstructImageFromDCT(int *quantized_Y,int *quantized_Cb,int *quantized_C
     BitmapInfoHeader InfoHeader,
     PixelYCbCr *converted
 );
+void processImageDCT(
+    PixelYCbCr *converted, 
+    BitmapInfoHeader InfoHeader, 
+    int **quantized_Y_out, 
+    int **quantized_Cb_out, 
+    int **quantized_Cr_out
+);
 
 #endif 
