@@ -316,17 +316,22 @@ void processImageDCT(
     free(CrDown);
 }
 
-void reconstructImageFromDCT(
+PixelYCbCr *reconstructImageFromDCT(
     int *quantized_Y,
     int *quantized_Cb,
     int *quantized_Cr,
-    BitmapInfoHeader InfoHeader,
-    PixelYCbCr *converted
+    BitmapInfoHeader InfoHeader
 ) {
     int totalPixels = InfoHeader.width * InfoHeader.height;
     int width_chroma = InfoHeader.width / 2;
     int height_chroma = InfoHeader.height / 2;
     int totalPixels_chroma = width_chroma * height_chroma;
+
+    PixelYCbCr *converted = malloc(totalPixels * sizeof(PixelYCbCr));
+    if (converted == NULL) {
+        fprintf(stderr, "Erro de alocação de memória para a imagem convertida.\n");
+        return NULL;
+    }
 
     // Dequantização
     double *dequantized_dct_Y = malloc(totalPixels * sizeof(double));
@@ -371,6 +376,8 @@ void reconstructImageFromDCT(
     free(reconstructedY);
     free(CbFull);
     free(CrFull);
+
+    return converted;
 }
 
 
@@ -389,6 +396,14 @@ void aplicarZigZag(int bloco[8][8], int vetor_saida[64]) {
         int x = zigzag_order[i] / 8;
         int y = zigzag_order[i] % 8;
         vetor_saida[i] = bloco[x][y];
+    }
+}
+
+void aplicarUnZigZag(int vetor[64], int bloco[8][8]) {
+    for (int i = 0; i < 64; i++) {
+        int x = zigzag_order[i] / 8;
+        int y = zigzag_order[i] % 8;
+        bloco[x][y] = vetor[i];
     }
 }
 
@@ -426,6 +441,147 @@ void codificarAC(int* ac, FILE* out) {
     // End of Block (EOB)
     unsigned char eob = 0x00;
     fwrite(&eob, 1, 1, out);
+}
+
+static unsigned char bit_buffer = 0;
+static int bits_disponiveis = 0;
+
+int lerUmBit(FILE* in) {
+    if (bits_disponiveis == 0) {
+        if (fread(&bit_buffer, 1, 1, in) != 1) {
+            return -1; // Erro ou EOF
+        }
+        bits_disponiveis = 8;
+    }
+
+    int bit = (bit_buffer >> 7) & 1;
+    bit_buffer <<= 1;
+    bits_disponiveis--;
+
+    return bit;
+}
+
+int lerBits(FILE* in, int n_bits) {
+    if (n_bits > 32) return -1;
+
+    int valor = 0;
+    for (int i = 0; i < n_bits; i++) {
+        int bit = lerUmBit(in);
+        if (bit == -1) return -1;
+        valor = (valor << 1) | bit;
+    }
+    return valor;
+}
+
+int decodificarMagnitude(int code, int categoria) {
+    if (categoria == 0) return 0;
+    int limite = 1 << (categoria - 1);
+    return (code < limite) ? code - (1 << categoria) + 1 : code;
+}
+
+void decodificarDC(FILE* in, int* anterior, int* valor) {
+    unsigned char cat;
+    fread(&cat, 1, 1, in);
+    if (cat == 0) {
+        *valor = *anterior;
+        return;
+    }
+
+    int mag = lerBits(in, cat);
+    int diff = decodificarMagnitude(mag, cat);
+    *valor = *anterior + diff;
+    *anterior = *valor;
+}
+
+void decodificarAC(FILE* in, int* vetor_zigzag) {
+    int pos = 1;
+    while (pos < 64) {
+        unsigned char byte;
+        fread(&byte, 1, 1, in);
+        if (byte == 0x00) {
+            // EOB
+            while (pos < 64) vetor_zigzag[pos++] = 0;
+            break;
+        }
+
+        if (byte == 0xF0) {
+            // ZRL
+            for (int i = 0; i < 16 && pos < 64; i++) vetor_zigzag[pos++] = 0;
+            continue;
+        }
+
+        int run = (byte >> 4) & 0xF;
+        int cat = byte & 0xF;
+
+        for (int i = 0; i < run && pos < 64; i++) vetor_zigzag[pos++] = 0;
+
+        int mag = lerBits(in, cat);
+        vetor_zigzag[pos++] = decodificarMagnitude(mag, cat);
+    }
+}
+
+void decompressEntropy(FILE* in, int** quantized_Y, int** quantized_Cb, int** quantized_Cr, BitmapInfoHeader* header) {
+    char magic[5] = {0};
+    fread(magic, 1, 4, in);
+    if (strcmp(magic, "JPG1") != 0) {
+        fprintf(stderr, "Formato inválido!\n");
+        exit(1);
+    }
+
+    int width, height;
+    fread(&width, sizeof(int), 1, in);
+    fread(&height, sizeof(int), 1, in);
+    
+    header->width = width;
+    header->height = height;
+    header->imageSize  = width * height * 3;
+
+    int blocos_Y = (width * height) / 64;
+    int blocos_C = (width/2 * height/2) / 64;
+
+    *quantized_Y = malloc(blocos_Y * 64 * sizeof(int));
+    *quantized_Cb = malloc(blocos_C * 64 * sizeof(int));
+    *quantized_Cr = malloc(blocos_C * 64 * sizeof(int));
+
+    int vetor_zigzag[64];
+    int bloco[8][8];
+    int dc_ant = 0;
+
+    // --- Y ---
+    dc_ant = 0;
+    for (int i = 0; i < blocos_Y; i++) {
+        decodificarDC(in, &dc_ant, &vetor_zigzag[0]);
+        decodificarAC(in, vetor_zigzag);
+
+        aplicarUnZigZag(vetor_zigzag, bloco);
+        for (int y = 0; y < 8; y++)
+            for (int x = 0; x < 8; x++)
+                (*quantized_Y)[i * 64 + y * 8 + x] = bloco[y][x];
+    }
+
+    // --- Cb ---
+    dc_ant = 0;
+    for (int i = 0; i < blocos_C; i++) {
+        decodificarDC(in, &dc_ant, &vetor_zigzag[0]);
+        decodificarAC(in, vetor_zigzag);
+
+        aplicarUnZigZag(vetor_zigzag, bloco);
+        for (int y = 0; y < 8; y++)
+            for (int x = 0; x < 8; x++)
+                (*quantized_Cb)[i * 64 + y * 8 + x] = bloco[y][x];
+    }
+
+    // --- Cr ---
+    dc_ant = 0;
+    for (int i = 0; i < blocos_C; i++) {
+        decodificarDC(in, &dc_ant, &vetor_zigzag[0]);
+        decodificarAC(in, vetor_zigzag);
+
+        aplicarUnZigZag(vetor_zigzag, bloco);
+        for (int y = 0; y < 8; y++)
+            for (int x = 0; x < 8; x++)
+                (*quantized_Cr)[i * 64 + y * 8 + x] = bloco[y][x];
+    }
 }
 
 

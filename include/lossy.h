@@ -27,10 +27,6 @@ void applyIdctToImage(double* dctCoeffs, int width, int height, double* image, d
 void quantizeImage(double* dctCoeffs, int* quantized, int width, int height, const int Q[8][8], double k);
 void dequantizeImage(int* quantized, double* dctCoeffs, int width, int height, const int Q[8][8], double k);
 void processImageDCT(PixelYCbCr *converted,BitmapInfoHeader InfoHeader, int **quantized_Y_out,int **quantized_Cb_out,int **quantized_Cr_out);
-void reconstructImageFromDCT(int *quantized_Y,int *quantized_Cb,int *quantized_Cr,
-    BitmapInfoHeader InfoHeader,
-    PixelYCbCr *converted
-);
 void processImageDCT(
     PixelYCbCr *converted, 
     BitmapInfoHeader InfoHeader, 
@@ -41,7 +37,19 @@ void processImageDCT(
 void codificarDC(int diff, FILE* out);
 void codificarAC(int* ac, FILE* out);
 void aplicarZigZag(int bloco[8][8], int vetor_saida[64]);
+void aplicarUnZigZag(int vetor[64], int bloco[8][8]);
 long entropy_encode(int* quantized_Y, int* quantized_Cb, int* quantized_Cr, int largura, int altura);
 int calcularCategoria(int valor);
+int lerBits(FILE* in, int bits);
+int decodificarMagnitude(int code, int categoria);
+void decodificarDC(FILE* in, int* anterior, int* valor);
+void decodificarAC(FILE* in, int* vetor_zigzag);
+void decompressEntropy(FILE* in, int** quantized_Y, int** quantized_Cb, int** quantized_Cr, BitmapInfoHeader* header);
+PixelYCbCr *reconstructImageFromDCT(
+    int *quantized_Y,
+    int *quantized_Cb,
+    int *quantized_Cr,
+    BitmapInfoHeader InfoHeader
+);
 
 #endif 

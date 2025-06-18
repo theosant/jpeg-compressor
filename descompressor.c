@@ -3,6 +3,8 @@
 #include <string.h>
 #include "bmp.h"
 #include "jpeg.h"
+#include "lossy.h"
+
 
 int main(int argc, char *argv[]) {
     if (argc != 4) {
@@ -34,18 +36,13 @@ int main(int argc, char *argv[]) {
         int *quantized_Y, *quantized_Cb, *quantized_Cr;
 
         // Leitura dos dados comprimidos (RLE + Huffman)
-        //decompressEntropy(inputFile, &quantized_Y, &quantized_Cb, &quantized_Cr, &InfoHeader);
+        decompressEntropy(inputFile, &quantized_Y, &quantized_Cb, &quantized_Cr, &InfoHeader);
 
         // Reverter quantização, IDCT, upsampling
-        //converted = reconstructImageFromDCT(quantized_Y, quantized_Cb, quantized_Cr, InfoHeader);
-
-        //free(quantized_Y);
-        //free(quantized_Cb);
-        //free(quantized_Cr);
-
-        // Preencher um cabeçalho BMP padrão (exemplo simples)
-        //FileHeader = createDefaultBmpHeader(InfoHeader);
-        
+        converted = reconstructImageFromDCT(quantized_Y, quantized_Cb, quantized_Cr, InfoHeader);
+        free(quantized_Y);
+        free(quantized_Cb);
+        free(quantized_Cr);
     } else if (strcmp(modo, "-lossless") == 0) {
         printf("Modo Descompressão sem perdas ativado.\n");
 
@@ -60,18 +57,8 @@ int main(int argc, char *argv[]) {
 
     // Converter YCbCr de volta para RGB
     Pixel* imageRGB = convertYCbCrToRgb(converted, InfoHeader);
-
-    // Salvar a imagem reconstruída
-    FILE* output = fopen(outputFile_nome, "wb");
-    if (!output) {
-        fprintf(stderr, "Erro ao abrir arquivo de saída.\n");
-        free(converted);
-        free(imageRGB);
-        return 1;
-    }
-
-    //saveBmpImage(output, FileHeader, InfoHeader, imageRGB);
-    fclose(output);
+    
+    saveBmpImage(outputFile_nome, FileHeader, InfoHeader, imageRGB);
 
     printf("Imagem reconstruída salva em '%s'.\n", outputFile_nome);
 
